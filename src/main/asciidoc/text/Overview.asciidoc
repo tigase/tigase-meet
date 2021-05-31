@@ -1,0 +1,8 @@
+[[mix]]
+= Overview
+
+:toc:
+:numbered:
+:website: https://www.tigase.net
+
+Tigase Meet component is a component implementing custom protocol allowing compatible clients to establish group video calls.
