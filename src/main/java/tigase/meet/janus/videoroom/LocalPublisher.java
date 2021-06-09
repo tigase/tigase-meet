@@ -8,6 +8,7 @@ package tigase.meet.janus.videoroom;
 
 import tigase.meet.janus.JSEP;
 import tigase.meet.janus.JanusPlugin;
+import tigase.meet.janus.JanusSession;
 
 import java.util.Collection;
 import java.util.List;
@@ -63,6 +64,10 @@ public class LocalPublisher {
 
 	public Object getRoomId() {
 		return roomId;
+	}
+
+	public JanusSession getSession() {
+		return videoRoomPlugin.getSession();
 	}
 
 	public void setListener(Listener listener) {

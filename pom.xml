@@ -14,6 +14,9 @@
         <guide_name>Tigase_Meet</guide_name>
         <documentation_phases.all_converters>generate-resources</documentation_phases.all_converters>
         <jackson.version>2.12.3</jackson.version>
+        <maven.compiler.source>12</maven.compiler.source>
+        <maven.compiler.target>12</maven.compiler.target>
+        <maven.compiler.release>1</maven.compiler.release>
     </properties>
 
     <artifactId>tigase-meet</artifactId>
@@ -43,9 +46,9 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <configuration>
-                    <source>11</source>
-                    <target>11</target>
-                    <release>11</release>
+                    <source>12</source>
+                    <target>12</target>
+                    <release>12</release>
                 </configuration>
             </plugin>
         </plugins>

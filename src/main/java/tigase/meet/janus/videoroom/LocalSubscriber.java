@@ -8,6 +8,7 @@ package tigase.meet.janus.videoroom;
 
 import tigase.meet.janus.JSEP;
 import tigase.meet.janus.JanusPlugin;
+import tigase.meet.janus.JanusSession;
 
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
@@ -27,6 +28,10 @@ public class LocalSubscriber {
 	public LocalSubscriber(JanusVideoRoomPlugin videoRoomPlugin, Object roomId) {
 		this.videoRoomPlugin = videoRoomPlugin;
 		this.roomId = roomId;
+	}
+
+	public JanusSession getSession() {
+		return videoRoomPlugin.getSession();
 	}
 
 	public CompletableFuture<JSEP> joinAsSubscriber(Long privateId, long publisherId,

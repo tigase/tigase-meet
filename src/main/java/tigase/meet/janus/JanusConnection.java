@@ -43,6 +43,12 @@ public class JanusConnection implements WebSocket.Listener {
 		this.sessionTimeout = sessionTimeout;
 	}
 
+	public void close() {
+		CompletableFuture.allOf(activeSessions.values().stream().map(session -> session.destroy()).toArray(CompletableFuture[]::new)).handle( (x, ex) -> {
+			return webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "ok");
+		});
+	}
+
 	public String getId() {
 		return id;
 	}

@@ -17,12 +17,13 @@ import tigase.kernel.AbstractKernelTestCase;
 import tigase.kernel.DefaultTypesConverter;
 import tigase.kernel.beans.config.AbstractBeanConfigurator;
 import tigase.kernel.core.Kernel;
-import tigase.meet.Meet;
-import tigase.meet.Participation;
+import tigase.meet.AbstractMeet;
+import tigase.meet.ParticipationWithListener;
 import tigase.meet.janus.videoroom.JanusVideoRoomPlugin;
 import tigase.util.log.LogFormatter;
 
 import java.util.Collections;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -62,9 +63,9 @@ public class MeetTest extends AbstractKernelTestCase {
 
 	@Test
 	public void test() throws ExecutionException, InterruptedException {
-		Meet meet = new Meet(janusService.newConnection().get(), 1234l);
+		MeetTest2 meet = new MeetTest2(janusService.newConnection().get(), 1234l);
 
-		Participation participation = meet.join().get();
+		ParticipationWithListener participation = meet.join().get();
 //		CompletableFuture<Meet.Participation> participantFuture2 = meet.join();
 //		CompletableFuture<Meet.Participation> participantFuture3 = meet.join();
 //		CompletableFuture.allOf(participantFuture1, participantFuture2, participantFuture3).get();
@@ -90,14 +91,14 @@ public class MeetTest extends AbstractKernelTestCase {
 			}
 		});
 		
-		participation.setListener(new Participation.Listener() {
+		participation.setListener(new ParticipationWithListener.Listener() {
 
 			@Override
 			public void receivedPublisherCandidate(JanusPlugin.Candidate candidate) {
 				RTCIceCandidate iceCandidate = new RTCIceCandidate(candidate.getMid(), candidate.getSdpMLineIndex(), candidate.getCandidate());
 				publisherConnection.addIceCandidate(iceCandidate);
 			}
-
+			
 			@Override
 			public void receivedPublisherSDP(JSEP jsep) {
 				RTCSessionDescription answer = new RTCSessionDescription(
@@ -139,8 +140,7 @@ public class MeetTest extends AbstractKernelTestCase {
 										@Override
 										public void onSuccess() {
 											System.out.println("local description set!");
-											participation.getSubscriber()
-													.start(new JSEP(JSEP.Type.answer, rtcSessionDescription.sdp));
+											participation.sendSubscriberSDP(new JSEP(JSEP.Type.answer, rtcSessionDescription.sdp));
 										}
 
 										@Override
@@ -200,4 +200,20 @@ public class MeetTest extends AbstractKernelTestCase {
 		}
 	}
 
+	public class MeetTest2 extends AbstractMeet<ParticipationWithListener> {
+
+		public MeetTest2(JanusConnection janusConnection, Object roomId) {
+			super(janusConnection, roomId);
+		}
+
+		@Override
+		public void left(ParticipationWithListener participation) {
+
+		}
+
+		public CompletableFuture<ParticipationWithListener> join() {
+			return join(((publisher, subscriber) -> new ParticipationWithListener(this, publisher, subscriber)));
+		}
+
+	}
 }
