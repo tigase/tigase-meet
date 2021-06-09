@@ -65,7 +65,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 
 	@Override
 	protected void receivedPublisherCandidate(String sessionId, JanusPlugin.Candidate candidate) {
-		Content content = convertCandidateToContent(Content.Creator.initiator, localSubscriberSDP, candidate);
+		Content content = convertCandidateToContent(Content.Creator.initiator, localPublisherSDP, candidate);
 		if (content != null) {
 			listener.receivedSubscriberCandidate(sessionId, content);
 		}
