@@ -36,7 +36,7 @@ public enum Action {
 	private final String value;
 
 	Action() {
-		this.value = name().replaceAll("([a-z])([A-Z]+)", "$1_$2").toLowerCase();
+		this.value = name().replaceAll("([a-z])([A-Z]+)", "$1-$2").toLowerCase();
 	}
 
 	public String getValue() {

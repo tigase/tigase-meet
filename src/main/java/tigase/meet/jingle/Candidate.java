@@ -47,7 +47,8 @@ public class Candidate {
 	}
 
 	public static Candidate from(String line) {
-		String[] parts = line.substring("a=candidate:".length()).split(" ");
+		int idx = "candidate:".length() + (line.startsWith("a=") ? 2 : 0);
+		String[] parts = line.substring(idx).split(" ");
 		if (parts.length >= 10) {
 			ProtocolType protocolType = ProtocolType.valueOf(parts[2].toLowerCase());
 			int priority = Integer.parseInt(parts[3]);

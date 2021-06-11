@@ -112,10 +112,14 @@ public class Payload {
 	}
 
 	public List<String> toSDP() {
-		StringBuilder line = new StringBuilder("a=rtpmap:").append(id).append(" ").append(name).append("/").append(clockrate);
-		if (channels > 1) {
-			line.append("/").append(channels);
-		}
+		StringBuilder line = new StringBuilder("a=rtpmap:").append(id);
+		name.ifPresent(name -> {
+			line.append(" ").append(name);
+			clockrate.ifPresent(clockrate -> line.append("/").append(clockrate));
+			if (channels > 1) {
+				line.append("/").append(channels);
+			}
+		});
 
 		List<String> lines = new ArrayList<>();
 		lines.add(line.toString());

@@ -15,9 +15,13 @@ import tigase.meet.janus.videoroom.Publisher;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>, M extends AbstractMeet<P>> implements LocalPublisher.Listener, LocalSubscriber.Listener {
+
+	private static final Logger log = Logger.getLogger(AbstractParticipation.class.getCanonicalName());
 
 	private final M meet;
 	protected final LocalPublisher publisher;
@@ -27,6 +31,8 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 		this.meet = meet;
 		this.publisher = localPublisher;
 		this.subscriber = localSubscriber;
+		this.subscriber.setListener(this);
+		this.publisher.setListener(this);
 	}
 
 	@Override
@@ -46,7 +52,7 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 	public CompletableFuture<JSEP> sendPublisherSDP(JSEP offer) {
 		return publisher.publish(offer).whenComplete((x, ex) -> {
 			if (ex != null) {
-				leave();
+				leave(ex);
 			}
 		});
 	}
@@ -59,15 +65,18 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 		return this.subscriber.sendCandidate(candidate);
 	}
 
-	public CompletableFuture<Void> sendSubscriberSDP(JSEP offer) {
-		return subscriber.start(offer).whenComplete((x, ex) -> {
+	public CompletableFuture<Void> sendSubscriberSDP(JSEP answer) {
+		return subscriber.start(answer).whenComplete((x, ex) -> {
 			if (ex != null) {
-				leave();
+				leave(ex);
 			}
 		});
 	}
 
-	public synchronized CompletableFuture<Void> leave() {
+	public synchronized CompletableFuture<Void> leave(Throwable ex) {
+		if (ex != null) {
+			log.log(Level.WARNING, ex, () -> "leaving due to error");
+		}
 		meet.left((P) this);
 		return CompletableFuture.allOf(publisher.leave()).thenCompose(x -> publisher.getSession().destroy());
 	}

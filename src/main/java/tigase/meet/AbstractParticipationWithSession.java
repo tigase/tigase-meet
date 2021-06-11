@@ -14,12 +14,15 @@ import tigase.xmpp.jid.JID;
 
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Logger;
 
 public abstract class AbstractParticipationWithSession<P extends AbstractParticipationWithSession<P,M>, M extends AbstractMeet<P>> extends AbstractParticipation<P,M> {
-	
+
+	private static final Logger log = Logger.getLogger(AbstractParticipationWithSession.class.getCanonicalName());
+
 	private final JID jid;
-	private Optional<Session> subscriberSession;
-	private Optional<Session> publisherSession;
+	private Optional<Session> subscriberSession = Optional.empty();
+	private Optional<Session> publisherSession = Optional.empty();
 
 	public AbstractParticipationWithSession(M meet, JID jid, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		super(meet, localPublisher, localSubscriber);
@@ -92,9 +95,9 @@ public abstract class AbstractParticipationWithSession<P extends AbstractPartici
 	protected abstract void receivedSubscriberCandidate(String sessionId, JanusPlugin.Candidate candidate);
 
 	@Override
-	public synchronized CompletableFuture<Void> leave() {
+	public synchronized CompletableFuture<Void> leave(Throwable ex) {
 		terminatePublisherSession();
 		terminateSubscriberSession();
-		return super.leave();
+		return super.leave(ex);
 	}
 }

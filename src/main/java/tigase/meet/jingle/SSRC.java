@@ -48,8 +48,8 @@ public class SSRC {
 					.filter(it -> it.startsWith(prefix))
 					.map(it -> it.substring(prefix.length()))
 					.map(it -> it.split(":"))
-					.filter(it -> !it[0].isEmpty())
-					.map(it -> new SSRC.Parameter(it[0], Optional.ofNullable(
+					.filter(it -> !it[0].trim().isEmpty())
+					.map(it -> new SSRC.Parameter(it[0].trim(), Optional.ofNullable(
 							it.length == 1 ? null : Arrays.stream(it).skip(1).collect(Collectors.joining(":")))))
 					.collect(Collectors.toList());
 			return new SSRC(ssrc, parameters);

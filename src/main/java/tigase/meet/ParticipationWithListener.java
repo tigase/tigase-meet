@@ -32,8 +32,6 @@ public class ParticipationWithListener extends AbstractParticipation<Participati
 	
 	public void setListener(Listener listener) {
 		this.listener = listener;
-		this.subscriber.setListener(this);
-		this.publisher.setListener(this);
 	}
 
 	@Override

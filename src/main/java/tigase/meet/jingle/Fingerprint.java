@@ -11,7 +11,7 @@ import tigase.xml.Element;
 public class Fingerprint {
 
 	public static Fingerprint from(Element el) {
-		if ("fingerprint".equals(el.getName()) && "urn:xmpp:jingle:apps:dtls:0".equals(el.getName())) {
+		if ("fingerprint".equals(el.getName()) && "urn:xmpp:jingle:apps:dtls:0".equals(el.getXMLNS())) {
 			String hash = el.getAttributeStaticStr("hash");
 			String value = el.getCData();
 			String setup = el.getAttributeStaticStr("setup");
