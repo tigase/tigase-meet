@@ -25,6 +25,7 @@ import tigase.util.log.LogFormatter;
 import java.util.Collections;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -72,6 +73,7 @@ public class AbstractMeetTest
 //		CompletableFuture.allOf(participantFuture1, participantFuture2, participantFuture3).get();
 
 		PeerConnectionFactory factory = new PeerConnectionFactory();
+		ReentrantLock lock = new ReentrantLock();
 		RTCPeerConnection publisherConnection = factory.createPeerConnection(new RTCConfiguration(), new PeerConnectionObserver() {
 			@Override
 			public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
@@ -132,30 +134,33 @@ public class AbstractMeetTest
 					subscriberConnection.setRemoteDescription(sessionDescription, new SetSessionDescriptionObserver() {
 						@Override
 						public void onSuccess() {
-							System.out.println("remote description set!");
-							subscriberConnection.createAnswer(new RTCAnswerOptions(), new CreateSessionDescriptionObserver() {
-								@Override
-								public void onSuccess(RTCSessionDescription rtcSessionDescription) {
-									System.out.println("response prepared!");
-									subscriberConnection.setLocalDescription(rtcSessionDescription, new SetSessionDescriptionObserver() {
-										@Override
-										public void onSuccess() {
-											System.out.println("local description set!");
-											participation.sendSubscriberSDP(new JSEP(JSEP.Type.answer, rtcSessionDescription.sdp));
-										}
+							if (jsep.getType() == JSEP.Type.offer) {
+								System.out.println("remote description set!");
+								subscriberConnection.createAnswer(new RTCAnswerOptions(), new CreateSessionDescriptionObserver() {
+									@Override
+									public void onSuccess(RTCSessionDescription rtcSessionDescription) {
+										System.out.println("response prepared!");
+										subscriberConnection.setLocalDescription(rtcSessionDescription, new SetSessionDescriptionObserver() {
+											@Override
+											public void onSuccess() {
+												System.out.println("local description set!");
+												participation.sendSubscriberSDP(
+														new JSEP(JSEP.Type.answer, rtcSessionDescription.sdp));
+											}
 
-										@Override
-										public void onFailure(String s) {
-											System.out.println("local description failed: " + s);
-										}
-									});
-								}
+											@Override
+											public void onFailure(String s) {
+												System.out.println("local description failed: " + s);
+											}
+										});
+									}
 
-								@Override
-								public void onFailure(String s) {
-									System.out.println("response creation failed: " + s);
-								}
-							});
+									@Override
+									public void onFailure(String s) {
+										System.out.println("response creation failed: " + s);
+									}
+								});
+							}
 						}
 
 						@Override

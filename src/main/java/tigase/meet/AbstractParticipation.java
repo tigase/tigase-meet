@@ -43,9 +43,7 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 	public void addedPublishers(Collection<Publisher> publishers) {
 		subscriber.subscribe(publishers.stream()
 									 .map(p -> new JanusVideoRoomPlugin.Stream(p.getId(), null))
-									 .collect(Collectors.toList())).thenAccept(jsep -> {
-			receivedSubscriberSDP(jsep);
-		});
+									 .collect(Collectors.toList()));
 	}
 
 	@Override

@@ -94,7 +94,7 @@ public class JingleMeetModule extends AbstractModule {
 									@Override
 									public void receivedSubscriberSDP(String sessionId, Participation.ContentAction contentAction,
 																	  SDP sdp) {
-										sendJingle(meetJid, from, Action.sessionInitiate, sessionId, sdp, participation);
+										sendJingle(meetJid, from, contentAction.toJingleAction(Action.sessionInitiate), sessionId, sdp, participation);
 									}
 
 									@Override

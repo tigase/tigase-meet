@@ -10,6 +10,9 @@ import tigase.meet.janus.JSEP;
 import tigase.meet.janus.JanusPlugin;
 import tigase.meet.janus.videoroom.LocalPublisher;
 import tigase.meet.janus.videoroom.LocalSubscriber;
+import tigase.meet.janus.videoroom.Publisher;
+
+import java.util.Collection;
 
 public class ParticipationWithListener extends AbstractParticipation<ParticipationWithListener,AbstractMeet<ParticipationWithListener>>
 		implements LocalPublisher.Listener, LocalSubscriber.Listener {
@@ -19,7 +22,19 @@ public class ParticipationWithListener extends AbstractParticipation<Participati
 	public ParticipationWithListener(AbstractMeet<ParticipationWithListener> meet, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		super(meet, localPublisher, localSubscriber);
 	}
-	
+
+	@Override
+	public void addedPublishers(Collection<Publisher> publishers) {
+		new Thread(() -> {
+			try {
+				Thread.sleep(1000);
+			} catch (InterruptedException e) {
+				e.printStackTrace();
+			}
+			ParticipationWithListener.super.addedPublishers(publishers);
+		}).start();
+	}
+
 	@Override
 	public void receivedPublisherSDP(JSEP jsep) {
 		listener.receivedPublisherSDP(jsep);
