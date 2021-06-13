@@ -23,9 +23,13 @@ import tigase.kernel.DefaultTypesConverter;
 import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.config.AbstractBeanConfigurator;
 import tigase.kernel.core.Kernel;
-import tigase.meet.*;
+import tigase.meet.AbstractMeet;
+import tigase.meet.Meet;
+import tigase.meet.MeetRepository;
+import tigase.meet.Participation;
 import tigase.meet.jingle.*;
 import tigase.meet.modules.JingleMeetModule;
+import tigase.meet.utils.DelayedRunQueue;
 import tigase.server.Packet;
 import tigase.util.log.LogFormatter;
 import tigase.util.stringprep.TigaseStringprepException;
@@ -39,6 +43,7 @@ import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
@@ -48,6 +53,8 @@ import java.util.stream.Collectors;
 import static org.junit.Assert.*;
 
 public class MeetTest extends AbstractKernelTestCase {
+
+	private static final Logger log = Logger.getLogger(MeetTest.class.getCanonicalName());
 
 	public static void configureLogging(Level level) {
 		ConsoleHandler handler = new ConsoleHandler();
@@ -104,31 +111,36 @@ public class MeetTest extends AbstractKernelTestCase {
 		AtomicReference<String> publisherSession = new AtomicReference<>();
 		AtomicReference<String> subscriberSession = new AtomicReference<>();
 
+		DelayedRunQueue publisherIceCandidateQueue = new DelayedRunQueue();
+
 		PeerConnectionFactory factory = new PeerConnectionFactory();
 		publisherConnection = factory.createPeerConnection(new RTCConfiguration(), new PeerConnectionObserver() {
+			
 			@Override
 			public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
-				Candidate candidate = Candidate.from(rtcIceCandidate.sdp);
-				Transport transport = SDP.from(publisherConnection.getLocalDescription().sdp, Content.Creator.initiator)
-						.getContents()
-						.stream()
-						.filter(it -> rtcIceCandidate.sdpMid.equals(it.getName()))
-						.findFirst()
-						.get()
-						.getTransports()
-						.stream()
-						.findFirst()
-						.get();
-				Content content = new Content(Content.Creator.initiator, rtcIceCandidate.sdpMid, Optional.empty(),
-											  Optional.empty(),
-											  List.of(new Transport(transport.getUfrag(), transport.getPwd(),
-																	List.of(candidate), Optional.empty())));
-				SDP sdp = new SDP("", List.of(content), Collections.emptyList());
-				Element iqEl = new Element("iq");
-				iqEl.setAttribute("id", UUID.randomUUID().toString());
-				iqEl.setAttribute("type", StanzaType.set.name());
-				iqEl.addChild(sdp.toElement(Action.transportInfo, publisherSession.get(), user1));
-				process(Packet.packetInstance(iqEl, user1, JID.jidInstanceNS(meetJid)));
+				publisherIceCandidateQueue.offer(() -> {
+					Candidate candidate = Candidate.from(rtcIceCandidate.sdp);
+					Transport transport = SDP.from(publisherConnection.getLocalDescription().sdp, Content.Creator.initiator)
+							.getContents()
+							.stream()
+							.filter(it -> rtcIceCandidate.sdpMid.equals(it.getName()))
+							.findFirst()
+							.get()
+							.getTransports()
+							.stream()
+							.findFirst()
+							.get();
+					Content content = new Content(Content.Creator.initiator, rtcIceCandidate.sdpMid, Optional.empty(),
+												  Optional.empty(),
+												  List.of(new Transport(transport.getUfrag(), transport.getPwd(),
+																		List.of(candidate), Optional.empty())));
+					SDP sdp = new SDP("", List.of(content), Collections.emptyList());
+					Element iqEl = new Element("iq");
+					iqEl.setAttribute("id", UUID.randomUUID().toString());
+					iqEl.setAttribute("type", StanzaType.set.name());
+					iqEl.addChild(sdp.toElement(Action.transportInfo, publisherSession.get(), user1));
+					process(Packet.packetInstance(iqEl, user1, JID.jidInstanceNS(meetJid)));
+				});
 			}
 		});
 
@@ -162,12 +174,21 @@ public class MeetTest extends AbstractKernelTestCase {
 				process(Packet.packetInstance(iqEl, user1, JID.jidInstanceNS(meetJid)));
 			}
 		});
-		
+
+		//ReentrantLock lock = new ReentrantLock();
 		packetWriter.packetConsumer = packet -> {
 			assertNotEquals(packet.getType(), StanzaType.error);
 
+			log.log(Level.FINEST, () -> "xmpp: C << S : " + packet.toString());
+
 			Element jingleEl = packet.getElemChild("jingle", "urn:xmpp:jingle:1");
+			if (jingleEl == null && packet.getType() == StanzaType.result) {
+				publisherIceCandidateQueue.delayFinished();
+				return;
+			}
 			assertNotNull(jingleEl);
+
+			ReentrantLock lock = new ReentrantLock();
 
 			System.out.println("<< " + jingleEl.getAttributeStaticStr("sid") + " : "+ jingleEl.getAttributeStaticStr("action"));
 			System.out.println(jingleEl.toString());
@@ -176,75 +197,106 @@ public class MeetTest extends AbstractKernelTestCase {
 			switch (action) {
 				case sessionInitiate:
 					subscriberSession.set(sessionId);
-					subscriberConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, SDP.from(jingleEl).toString("0")),
-															  new SetSessionDescriptionObserver() {
-																  @Override
-																  public void onSuccess() {
-																	  System.out.println("remote description set!");
-																	  subscriberConnection.createAnswer(new RTCAnswerOptions(),
-																										new CreateSessionDescriptionObserver() {
-																											@Override
-																											public void onSuccess(
-																													RTCSessionDescription rtcSessionDescription) {
-																												System.out.println("response prepared!");
-																												subscriberConnection.setLocalDescription(
-																														rtcSessionDescription,
-																														new SetSessionDescriptionObserver() {
-																															@Override
-																															public void onSuccess() {
-																																System.out.println(
-																																		"local description set!");
-																																Element iqEl = new Element(
-																																		"iq");
-																																iqEl.setAttribute("id",
-																																				  UUID.randomUUID()
-																																						  .toString());
-																																iqEl.setAttribute("type",
-																																				  StanzaType.set
-																																						  .name());
-																																iqEl.addChild(SDP.from(
-																																		rtcSessionDescription.sdp,
-																																		Content.Creator.responder)
-																																					  .toElement(
-																																							  Action.sessionAccept,
-																																							  sessionId,
-																																							  user1));
-																																MeetTest.this.process(
-																																		Packet.packetInstance(
-																																				iqEl,
-																																				user1,
-																																				JID.jidInstanceNS(
-																																						meetJid)));
-																															}
+					lock.lock();
+					//new Thread(() -> {
+						try {
+							subscriberConnection.setRemoteDescription(new
 
-																															@Override
-																															public void onFailure(
-																																	String s) {
-																																System.out.println(
-																																		"local description failed: " +
-																																				s);
-																															}
-																														});
-																											}
+																			  RTCSessionDescription(RTCSdpType.OFFER,
+																									SDP.from(jingleEl).
 
-																											@Override
-																											public void onFailure(String s) {
-																												System.out.println(
-																														"response creation failed: " + s);
-																											}
-																										});
-																  }
+																											toString("0")),
+																	  new
 
-																  @Override
-																  public void onFailure(String s) {
-																	  System.out.println("remote description failed: " + s);
-																  }
-															  });
+																			  SetSessionDescriptionObserver() {
+																				  @Override
+																				  public void onSuccess() {
+																					  System.out.println(
+																							  "remote description set!");
+																					  subscriberConnection.createAnswer(
+																							  new RTCAnswerOptions(),
+																							  new CreateSessionDescriptionObserver() {
+																								  @Override
+																								  public void onSuccess(
+																										  RTCSessionDescription rtcSessionDescription) {
+																									  System.out.println(
+																											  "response prepared!");
+																									  subscriberConnection
+																											  .setLocalDescription(
+																													  rtcSessionDescription,
+																													  new SetSessionDescriptionObserver() {
+																														  @Override
+																														  public void onSuccess() {
+																															  System.out
+																																	  .println(
+																																			  "local description set!");
+																															  Element iqEl = new Element(
+																																	  "iq");
+																															  iqEl.setAttribute(
+																																	  "id",
+																																	  UUID.randomUUID()
+																																			  .toString());
+																															  iqEl.setAttribute(
+																																	  "type",
+																																	  StanzaType.set
+																																			  .name());
+																															  iqEl.addChild(
+																																	  SDP.from(
+																																			  rtcSessionDescription.sdp,
+																																			  Content.Creator.responder)
+																																			  .toElement(
+																																					  Action.sessionAccept,
+																																					  sessionId,
+																																					  user1));
+																															  MeetTest.this
+																																	  .process(
+																																			  Packet.packetInstance(
+																																					  iqEl,
+																																					  user1,
+																																					  JID.jidInstanceNS(
+																																							  meetJid)));
+																															  lock.unlock();
+																														  }
+
+																														  @Override
+																														  public void onFailure(
+																																  String s) {
+																															  System.out
+																																	  .println(
+																																			  "local description failed: " +
+																																					  s);
+																														  }
+																													  });
+																								  }
+
+																								  @Override
+																								  public void onFailure(
+																										  String s) {
+																									  System.out.println(
+																											  "response creation failed: " +
+																													  s);
+																								  }
+																							  });
+																				  }
+
+																				  @Override
+																				  public void onFailure(String s) {
+																					  System.out.println(
+																							  "remote description failed: " +
+																									  s);
+																					  System.out.println("yy: " + SDP.from(jingleEl).toString("0"));
+																				  }
+																			  });
+						} catch (Throwable ex) {
+							ex.printStackTrace();
+							System.out.println("xx: " + SDP.from(jingleEl).toString("0"));
+						}
+//					}).start();
 					process(packet.okResult((String) null, 0));
 					break;
 				case sessionAccept:
 					assertEquals(publisherSession.get(), sessionId);
-					new Thread(() -> {
+					//new Thread(() -> {
 						publisherConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.ANSWER, SDP.from(jingleEl).toString("0")),
 																 new SetSessionDescriptionObserver() {
 																	 @Override
@@ -257,12 +309,14 @@ public class MeetTest extends AbstractKernelTestCase {
 																		 System.out.println("remote description failed: " + s);
 																	 }
 																 });
-					}).start();
+					//}).start();
 					process(packet.okResult((String) null, 0));
 					break;
 				case transportInfo: {
 					SDP sdp = SDP.from(jingleEl);
 					if (sessionId.equals(publisherSession.get())) {
+						System.out.println("publisherConnection: " + publisherConnection);
+						System.out.println("publisherConnection.getRemoteDescription().sdp: " + publisherConnection.getRemoteDescription());
 						List<String> mLines = Arrays.stream(publisherConnection.getRemoteDescription().sdp.split("\r\n"))
 								.filter(it -> it.startsWith("a=mid:"))
 								.collect(Collectors.toList());
@@ -271,12 +325,15 @@ public class MeetTest extends AbstractKernelTestCase {
 								for (Candidate candidate : transport.getCandidates()) {
 									int mLineIndex = mLines.indexOf("a=mid:" + content.getName());
 									RTCIceCandidate iceCandidate = new RTCIceCandidate(content.getName(), mLineIndex,
-																					   candidate.toSDP());
+																					   "a=" + candidate.toSDP());
 									publisherConnection.addIceCandidate(iceCandidate);
 								}
 							}
 						}
 					} else if (sessionId.equals(subscriberSession.get())) {
+						lock.lock();
+						System.out.println("subscriberConnection: " + subscriberConnection);
+						System.out.println("subscriberConnection.getRemoteDescription().sdp: " + subscriberConnection.getRemoteDescription());
 						List<String> mLines = Arrays.stream(subscriberConnection.getRemoteDescription().sdp.split("\r\n"))
 								.filter(it -> it.startsWith("a=mid:"))
 								.collect(Collectors.toList());
@@ -285,11 +342,12 @@ public class MeetTest extends AbstractKernelTestCase {
 								for (Candidate candidate : transport.getCandidates()) {
 									int mLineIndex = mLines.indexOf("a=mid:" + content.getName());
 									RTCIceCandidate iceCandidate = new RTCIceCandidate(content.getName(), mLineIndex,
-																					   candidate.toSDP());
+																					   "a=" + candidate.toSDP());
 									subscriberConnection.addIceCandidate(iceCandidate);
 								}
 							}
 						}
+						lock.unlock();
 					} else {
 						assertTrue("Invalid session id: " + sessionId, false);
 					}
@@ -336,6 +394,7 @@ public class MeetTest extends AbstractKernelTestCase {
 				default:
 					throw new UnsupportedOperationException("Jingle action " + action + " is not supported!");
 			}
+			log.log(Level.FINEST, "packet with id " + packet.getAttributeStaticStr("id") + " was processed!");
 		};
 
 		publisherSession.set(UUID.randomUUID().toString());
@@ -369,15 +428,20 @@ public class MeetTest extends AbstractKernelTestCase {
 
 		for (int i = 0; i < 1000; i++) {
 			System.out.println("peer connection 1 state: " + publisherConnection.getConnectionState() + ", " + publisherConnection.getIceConnectionState());
-			System.out.println("peer connection 2 state: " + subscriberConnection.getConnectionState() + ", " + subscriberConnection.getIceConnectionState());
+			//-- COMPARE THAT WITH AbstractMeetTest!!
+			System.out.println("peer connection 2 state: " + subscriberConnection.getConnectionState() + ", " + subscriberConnection.getIceConnectionState() + "\n" + subscriberConnection.getCurrentLocalDescription() + "\n" + subscriberConnection.getCurrentRemoteDescription());
 			Thread.sleep(1000);
 		}
 	}
 
 	protected void process(Packet packet) {
+		log.log(Level.FINEST, () -> "xmpp: C >> S " + packet.toString());
 		Element jingleEl = packet.getElemChild("jingle", "urn:xmpp:jingle:1");
-		System.out.println(">> " + jingleEl.getAttributeStaticStr("sid") + " : "+ jingleEl.getAttributeStaticStr("action"));
-		System.out.println(jingleEl.toString());
+		if (jingleEl != null) {
+			System.out.println(
+					">> " + jingleEl.getAttributeStaticStr("sid") + " : " + jingleEl.getAttributeStaticStr("action"));
+			System.out.println(jingleEl.toString());
+		}
 		Runnable run = Optional.ofNullable(packetWriter.getProcessor(packet)).orElse(() -> {
 			try {
 				jingleMeetModule.process(packet);
@@ -386,23 +450,6 @@ public class MeetTest extends AbstractKernelTestCase {
 			}
 		});
 		run.run();
-	}
-
-	public class MeetTest2 extends AbstractMeet<ParticipationWithListener> {
-
-		public MeetTest2(JanusConnection janusConnection, Object roomId) {
-			super(janusConnection, roomId);
-		}
-
-		@Override
-		public void left(ParticipationWithListener participation) {
-
-		}
-
-		public CompletableFuture<ParticipationWithListener> join() {
-			return join(((publisher, subscriber) -> new ParticipationWithListener(this, publisher, subscriber)));
-		}
-
 	}
 
 	@Bean(name = "packetWriter", active = true)

@@ -34,7 +34,7 @@ public class Content {
 		return null;
 	}
 
-	public static Content from(String sdp, Content.Creator creator) {
+	public static Content from(String sdp, String[] sessionLines, Content.Creator creator) {
 		String[] lines = sdp.split("\r\n");
 		String[] line = lines[0].split(" ");
 		String mediaName = line[0].substring(2);
@@ -107,21 +107,13 @@ public class Content {
 				.map(Candidate::from)
 				.filter(Objects::nonNull)
 				.collect(Collectors.toList());
-		Optional<Fingerprint.Setup> setup = Arrays.stream(lines)
-				.filter(it -> it.startsWith("a=setup:"))
-				.findFirst()
-				.map(it -> it.substring("a=setup:".length()))
-				.map(Fingerprint.Setup::valueOf);
-		Optional<Fingerprint> fingerprint = setup.flatMap(setupValue -> {
-			return Arrays.stream(lines)
-					.filter(it -> it.startsWith("a=fingerprint:"))
-					.map(it -> it.substring("a=fingerprint:".length()).split(" "))
-					.filter(it -> it.length >= 2)
-					.findFirst()
-					.map(it -> {
-						return new Fingerprint(it[0], it[1], setupValue);
-					});
-		});
+
+		Optional<Fingerprint.Setup> setup = Fingerprint.Setup.from(lines).or(() -> Fingerprint.Setup.from(sessionLines));
+		Optional<Fingerprint.FingerprintData> fingerprintData = Fingerprint.FingerprintData.from(lines).or(() -> Fingerprint.FingerprintData.from(sessionLines));
+
+		Optional<Fingerprint> fingerprint = setup.flatMap(setupValue -> fingerprintData.map(
+				fingerprintDataValue -> new Fingerprint(fingerprintDataValue.getHash(), fingerprintDataValue.getValue(),
+														setupValue)));
 		Transport transport = new Transport(ufrag, pwd, candidates, fingerprint);
 
 		return new Content(creator,name, senders, Optional.of(description), List.of(transport));
@@ -236,8 +228,8 @@ public class Content {
 		List<String> lines = new ArrayList<>();
 
 		description.ifPresent(description -> {
-			String proto = (description.getEncryptions().isEmpty() ||
-					!transports.stream().filter(it -> it.getFingerprint() == null).findAny().isEmpty())
+			String proto = (description.getEncryptions().isEmpty() &&
+					!transports.stream().filter(it -> it.getFingerprint().isEmpty()).findAny().isEmpty())
 						   ? "RTP/AVPF"
 						   : "RTP/SAVPF";
 			lines.add("m=" + description.getMedia() + " 1 " + proto + " " + description.getPayloads()
@@ -279,10 +271,13 @@ public class Content {
 			description.getHdrExts().stream().map(HdrExt::toSDP).forEach(lines::add);
 			description.getSsrcGroups().stream().map(SSRCGroup::toSDP).forEach(lines::add);
 			description.getSsrcs().stream().map(SSRC::toSDP).flatMap(Collection::stream).forEach(lines::add);
+
+			description.getSsrcs().stream().map(SSRC::getParameters).flatMap(it -> it.stream()).filter(it -> "msid".equals(it.getName()) && it.getValue().isPresent()).map(
+					SSRC.Parameter::getValue).map(Optional::get).distinct().map(it -> "a=msid:" + it).forEach(lines::add);
 		});
 
 		transports.stream().findFirst().ifPresent(transport -> {
-			transport.getCandidates().stream().map(Candidate::toSDP).forEach(lines::add);
+			transport.getCandidates().stream().map(Candidate::toSDP).map(it -> "a=" + it).forEach(lines::add);
 		});
 
 		return lines.stream().collect(Collectors.joining("\r\n"));

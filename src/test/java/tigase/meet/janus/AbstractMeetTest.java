@@ -196,7 +196,7 @@ public class AbstractMeetTest
 
 		for (int i = 0; i < 1000; i++) {
 			System.out.println("peer connection 1 state: " + publisherConnection.getConnectionState() + ", " + publisherConnection.getIceConnectionState());
-			System.out.println("peer connection 2 state: " + subscriberConnection.getConnectionState() + ", " + subscriberConnection.getIceConnectionState());
+			System.out.println("peer connection 2 state: " + subscriberConnection.getConnectionState() + ", " + subscriberConnection.getIceConnectionState() + "\n" + subscriberConnection.getCurrentLocalDescription() + "\n" + subscriberConnection.getCurrentRemoteDescription());
 			Thread.sleep(1000);
 		}
 	}

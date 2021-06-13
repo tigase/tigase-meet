@@ -13,6 +13,7 @@ import tigase.meet.janus.videoroom.LocalSubscriber;
 import tigase.xmpp.jid.JID;
 
 import java.util.Optional;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Logger;
 
@@ -81,7 +82,10 @@ public abstract class AbstractParticipationWithSession<P extends AbstractPartici
 	protected abstract void receivedPublisherCandidate(String sessionId, JanusPlugin.Candidate candidate);
 
 	@Override
-	public void receivedSubscriberSDP(JSEP jsep) {
+	public synchronized void receivedSubscriberSDP(JSEP jsep) {
+		if (getSubscriberSessionId().isEmpty()) {
+			startSubscriberSession(UUID.randomUUID().toString());
+		}
 		getSubscriberSessionId().ifPresent(sessionId -> receivedSubscriberSDP(sessionId, jsep));
 	}
 
@@ -99,5 +103,10 @@ public abstract class AbstractParticipationWithSession<P extends AbstractPartici
 		terminatePublisherSession();
 		terminateSubscriberSession();
 		return super.leave(ex);
+	}
+
+	@Override
+	public String toString() {
+		return "AbstractParticipationWithSession{" + "jid=" + jid + ", " + "meet=" + getMeet()  + '}';
 	}
 }

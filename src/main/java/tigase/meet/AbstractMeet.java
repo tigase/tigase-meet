@@ -41,9 +41,18 @@ public abstract class AbstractMeet<T extends AbstractParticipation> {
 						.thenCompose(plugin -> plugin.createPublisher(roomId))
 						.thenCombineAsync(session.attachPlugin(JanusVideoRoomPlugin.class)
 												  .thenApply(plugin -> plugin.createSubscriber(roomId)),
-										  participationConstructor));
+										  participationConstructor)
+						.whenComplete((x, ex1) -> {
+							if (ex1 != null) {
+								session.destroy();
+							}
+						}));
 	}
 
 	public abstract void left(T participation);
 
+	@Override
+	public String toString() {
+		return "AbstractMeet{" + "roomId=" + roomId + ", janusConnection=" + janusConnection + '}';
+	}
 }

@@ -42,6 +42,10 @@ public class SSRC {
 				.map(it -> it.substring("a=ssrc:".length()))
 				.map(it -> it.split(" ")[0])
 				.distinct();
+		Optional<String> msid = Arrays.stream(lines)
+				.filter(it -> it.startsWith("a=msid:"))
+				.map(it -> it.substring("a=msid:".length()))
+				.findFirst();
 		return ssrcs.map(ssrc -> {
 			String prefix = "a=ssrc:" + ssrc;
 			List<SSRC.Parameter> parameters = Arrays.stream(lines)
@@ -52,6 +56,11 @@ public class SSRC {
 					.map(it -> new SSRC.Parameter(it[0].trim(), Optional.ofNullable(
 							it.length == 1 ? null : Arrays.stream(it).skip(1).collect(Collectors.joining(":")))))
 					.collect(Collectors.toList());
+			if (parameters.stream().filter(it -> "msid".equals(it.getName())).findAny().isEmpty()) {
+				msid.ifPresent(value -> {
+					parameters.add(new SSRC.Parameter("msid", msid));
+				});
+			}
 			return new SSRC(ssrc, parameters);
 		}).collect(Collectors.toList());
 	}

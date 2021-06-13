@@ -8,7 +8,36 @@ package tigase.meet.jingle;
 
 import tigase.xml.Element;
 
+import java.util.Arrays;
+import java.util.Optional;
+
 public class Fingerprint {
+
+	public static class FingerprintData {
+		public static Optional<FingerprintData> from(String[] lines) {
+			return Arrays.stream(lines)
+					.filter(it -> it.startsWith("a=fingerprint:"))
+					.map(it -> it.substring("a=fingerprint:".length()).split(" "))
+					.filter(it -> it.length >= 2)
+					.findFirst().map(it -> new FingerprintData(it[0], it[1]));
+		}
+
+		private final String hash;
+		private final String value;
+
+		public FingerprintData(String hash, String value) {
+			this.hash = hash;
+			this.value = value;
+		}
+
+		public String getHash() {
+			return hash;
+		}
+
+		public String getValue() {
+			return value;
+		}
+	}
 
 	public static Fingerprint from(Element el) {
 		if ("fingerprint".equals(el.getName()) && "urn:xmpp:jingle:apps:dtls:0".equals(el.getXMLNS())) {
@@ -24,7 +53,15 @@ public class Fingerprint {
 	}
 
 	public enum Setup {
-		actpass, active, passive
+		actpass, active, passive;
+
+		public static Optional<Setup> from(String[] lines) {
+			return Arrays.stream(lines)
+					.filter(it -> it.startsWith("a=setup:"))
+					.findFirst()
+					.map(it -> it.substring("a=setup:".length()))
+					.map(Fingerprint.Setup::valueOf);
+		}
 	}
 
 	private final String hash;

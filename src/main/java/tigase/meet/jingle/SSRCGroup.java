@@ -25,7 +25,7 @@ public class SSRCGroup {
 			}
 
 			List<String> sources = Optional.ofNullable(
-					el.mapChildren(it -> "source".equals(it.getXMLNS()), it -> it.getAttributeStaticStr("ssrc")))
+					el.mapChildren(it -> "source".equals(it.getName()), it -> it.getAttributeStaticStr("ssrc")))
 					.orElse(Collections.emptyList());
 			return new SSRCGroup(semantics, sources);
 		}

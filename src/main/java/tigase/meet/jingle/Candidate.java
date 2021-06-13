@@ -14,7 +14,7 @@ import java.util.UUID;
 public class Candidate {
 
 	public static Candidate from(Element el) {
-		if ("candidate".equals(el)) {
+		if ("candidate".equals(el.getName())) {
 			String component = el.getAttributeStaticStr("component");
 			String foundation = el.getAttributeStaticStr("foundation");
 			String generation = el.getAttributeStaticStr("generation");
@@ -49,7 +49,7 @@ public class Candidate {
 	public static Candidate from(String line) {
 		int idx = "candidate:".length() + (line.startsWith("a=") ? 2 : 0);
 		String[] parts = line.substring(idx).split(" ");
-		if (parts.length >= 10) {
+		if (parts.length >= 8) {
 			ProtocolType protocolType = ProtocolType.valueOf(parts[2].toLowerCase());
 			int priority = Integer.parseInt(parts[3]);
 			int port = Integer.parseInt(parts[5]);
@@ -82,9 +82,7 @@ public class Candidate {
 				i = i + 2;
 			}
 
-			if (generation.isPresent()) {
-				return new Candidate(parts[1], parts[0], generation.get(), UUID.randomUUID().toString(), parts[4], 0, port, priority, protocolType, relAddr, relPort, Optional.of(type), tcpType);
-			}
+			return new Candidate(parts[1], parts[0], generation.orElse(0), UUID.randomUUID().toString(), parts[4], 0, port, priority, protocolType, relAddr, relPort, Optional.of(type), tcpType);
 		}
 		return null;
 	}
@@ -202,7 +200,7 @@ public class Candidate {
 	public String toSDP() {
 		CandidateType type = this.type.orElse(CandidateType.host);
 		StringBuilder sb = new StringBuilder();
-		sb.append("a=candidate:")
+		sb.append("candidate:")
 				.append(foundation)
 				.append(" ")
 				.append(component)
@@ -214,7 +212,7 @@ public class Candidate {
 				.append(ip)
 				.append(" ")
 				.append(port)
-				.append(" type ")
+				.append(" typ ")
 				.append(type.name());
 
 		if (type != CandidateType.host) {

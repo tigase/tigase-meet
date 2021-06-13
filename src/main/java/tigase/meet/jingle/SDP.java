@@ -59,12 +59,12 @@ public class SDP {
 				.findFirst()
 				.map(it -> it.split(" "));
 
-		List<String> bundle = groupParts.filter(it -> "a=group:BUNDLE ".equals(it[0]))
+		List<String> bundle = groupParts.filter(it -> "a=group:BUNDLE".equals(it[0]))
 				.map(it -> Arrays.stream(it).skip(1).collect(Collectors.toList()))
 				.orElse(Collections.emptyList());
 
 		List<Content> contents = media.stream()
-				.map(m -> Content.from(m, creator))
+				.map(m -> Content.from(m, sessionLines, creator))
 				.filter(Objects::nonNull)
 				.collect(Collectors.toList());
 		return new SDP(id, contents, bundle);

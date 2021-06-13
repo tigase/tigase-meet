@@ -168,7 +168,7 @@ public abstract class JanusPlugin<T extends JanusPlugin.Content> {
 	public static class Candidate {
 
 		public static final Candidate fromMap(Map<String, Object> data) {
-			return new Candidate((String) data.get("mid"), ((Number) data.get("sdpMLineIndex")).intValue(),
+			return new Candidate((String) data.get("sdpMid"), ((Number) data.get("sdpMLineIndex")).intValue(),
 								 (String) data.get("candidate"));
 		}
 
@@ -196,10 +196,16 @@ public abstract class JanusPlugin<T extends JanusPlugin.Content> {
 
 		public void write(JsonGenerator generator) throws IOException {
 			generator.writeStartObject();
-			generator.writeStringField("mid", mid);
+			generator.writeStringField("sdpMid", mid);
 			generator.writeNumberField("sdpMLineIndex", sdpMLineIndex);
 			generator.writeStringField("candidate", candidate);
 			generator.writeEndObject();
+		}
+
+		@Override
+		public String toString() {
+			return "Candidate{" + "mid='" + mid + '\'' + ", sdpMLineIndex=" + sdpMLineIndex + ", candidate='" +
+					candidate + '\'' + '}';
 		}
 	}
 }

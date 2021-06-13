@@ -12,6 +12,7 @@ import tigase.meet.janus.JanusPlugin;
 import tigase.meet.janus.videoroom.LocalPublisher;
 import tigase.meet.janus.videoroom.LocalSubscriber;
 import tigase.meet.jingle.*;
+import tigase.meet.utils.DelayedRunQueue;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.JID;
 
@@ -20,9 +21,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import java.util.stream.Collectors;
 
 public class Participation extends AbstractParticipationWithSession<Participation,Meet> {
+
+	private static final Logger log = Logger.getLogger(Participation.class.getCanonicalName());
 
 	private SDP localPublisherSDP;
 	private SDP localSubscriberSDP;
@@ -30,6 +35,10 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	private JSEP remoteSubscriberSDP;
 
 	private Listener listener;
+
+	private final DelayedRunQueue cachedLocalPublisherCandidatesQueue = new DelayedRunQueue();
+	private final DelayedRunQueue cachedLocalSubscriberCandidatesQueue = new DelayedRunQueue();
+
 
 	public Participation(Meet meet, JID jid, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		super(meet, jid, localPublisher, localSubscriber);
@@ -58,22 +67,35 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 			JSEP jsepOffer = new JSEP(JSEP.Type.offer, sdpOffer.toString("0"));
 			this.remotePublisherSDP = jsepOffer;
 			return this.sendPublisherSDP(jsepOffer)
-					.thenApply(jsepAnswer -> SDP.from(jsepAnswer.getSdp(), Content.Creator.responder));
+					.thenApply(jsepAnswer -> SDP.from(jsepAnswer.getSdp(), Content.Creator.responder))
+					.whenComplete((answerSDP, ex) -> {
+						synchronized (this) {
+							this.localPublisherSDP = answerSDP;
+							cachedLocalPublisherCandidatesQueue.delayFinished();
+						}
+					});
 		} else {
 			JSEP jsepOffer = new JSEP(JSEP.Type.offer, prevSDP.applyDiff(action, sdpOffer).toString("0"));
 			this.remotePublisherSDP = jsepOffer;
 			return this.sendPublisherSDP(jsepOffer)
-					.thenApply(jsepAnswer -> SDP.from(jsepAnswer.getSdp(), Content.Creator.responder));
+					.thenApply(jsepAnswer -> SDP.from(jsepAnswer.getSdp(), Content.Creator.responder))
+					.whenComplete((answerSDP, ex) -> {
+						synchronized (this) {
+							this.localPublisherSDP = answerSDP;
+							cachedLocalPublisherCandidatesQueue.delayFinished();
+						}
+					});
 		}
 	}
-	
+
 	@Override
-	protected void receivedPublisherSDP(String sessionId, JSEP jsep) {
+	protected synchronized void receivedPublisherSDP(String sessionId, JSEP jsep) {
 		SDP prevSDP = this.localPublisherSDP;
 		SDP currentSDP = SDP.from(jsep.getSdp(), Content.Creator.responder);
 		this.localPublisherSDP = currentSDP;
 		if (prevSDP == null) {
 			listener.receivedPublisherSDP(sessionId, ContentAction.init, currentSDP);
+			cachedLocalPublisherCandidatesQueue.delayFinished();
 		} else {
 			// we need to calculate and post notifications
 			Map<ContentAction, SDP> results = currentSDP.diffFrom(prevSDP);
@@ -87,10 +109,34 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	}
 
 	@Override
-	protected void receivedPublisherCandidate(String sessionId, JanusPlugin.Candidate candidate) {
-		Content content = convertCandidateToContent(Content.Creator.initiator, localPublisherSDP, candidate);
-		if (content != null) {
-			listener.receivedSubscriberCandidate(sessionId, content);
+	protected synchronized void receivedPublisherCandidate(String sessionId, JanusPlugin.Candidate candidate) {
+		cachedLocalPublisherCandidatesQueue.offer(() -> {
+			Content content = convertCandidateToContent(Content.Creator.initiator, localPublisherSDP, candidate);
+			if (content != null) {
+				listener.receivedPublisherCandidate(sessionId, content);
+			} else {
+				log.log(Level.WARNING, "ERROR: it was not possible to convert publisher JanusPlugin.Candidate to Candidate, " + candidate);
+			}
+		});
+	}
+
+	public CompletableFuture<Void> sendSubscriberSDP(String sessionId, ContentAction action, SDP sdpAnswer) {
+		if (getSubscriberSessionId().filter(sessionId::equals).isEmpty()) {
+			return CompletableFuture.failedFuture(new ComponentException(Authorization.CONFLICT));
+		}
+
+		SDP prevSDP = this.remoteSubscriberSDP == null
+					  ? null
+					  : SDP.from(this.remoteSubscriberSDP.getSdp(), Content.Creator.initiator);
+
+		if (prevSDP == null) {
+			JSEP jsepOffer = new JSEP(JSEP.Type.answer, sdpAnswer.toString("0"));
+			this.remoteSubscriberSDP = jsepOffer;
+			return this.sendSubscriberSDP(jsepOffer);
+		} else {
+			JSEP jsepOffer = new JSEP(JSEP.Type.answer, prevSDP.applyDiff(action, sdpAnswer).toString("0"));
+			this.remoteSubscriberSDP = jsepOffer;
+			return this.sendSubscriberSDP(jsepOffer);
 		}
 	}
 
@@ -101,6 +147,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 		this.localSubscriberSDP = currentSDP;
 		if (prevSDP == null) {
 			listener.receivedSubscriberSDP(sessionId, ContentAction.init, currentSDP);
+			cachedLocalSubscriberCandidatesQueue.delayFinished();
 		} else {
 			// we need to calculate and post notifications
 			Map<ContentAction, SDP> results = currentSDP.diffFrom(prevSDP);
@@ -115,10 +162,14 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 
 	@Override
 	protected void receivedSubscriberCandidate(String sessionId, JanusPlugin.Candidate candidate) {
-		Content content = convertCandidateToContent(Content.Creator.initiator, localSubscriberSDP, candidate);
-		if (content != null) {
-			listener.receivedSubscriberCandidate(sessionId, content);
-		}
+		cachedLocalSubscriberCandidatesQueue.offer(() -> {
+			Content content = convertCandidateToContent(Content.Creator.initiator, localSubscriberSDP, candidate);
+			if (content != null) {
+				listener.receivedSubscriberCandidate(sessionId, content);
+			} else {
+				log.log(Level.WARNING, "ERROR: it was not possible to convert subscriber JanusPlugin.Candidate to Candidate, " + candidate);
+			}
+		});
 	}
 
 	public void sendCandidate(String sessionId, String contentName, Candidate candidate) {
@@ -139,10 +190,21 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	}
 
 	public void sendSubscriberCandidate(String contentName, Candidate candidate) {
-		sendPublisherCandidate(
+		sendSubscriberCandidate(
 				new JanusPlugin.Candidate(contentName, findSdpMLineIndex(remoteSubscriberSDP, contentName),
 										  candidate.toSDP()));
 	}
+
+	public CompletableFuture<Void> updateSDP(String sessionId, ContentAction action, SDP sdp) {
+		if (getPublisherSessionId().filter(sessionId::equals).isPresent()) {
+			return sendPublisherSDP(sessionId, action, sdp).thenApply(x -> null);
+		}
+		if (getSubscriberSessionId().filter(sessionId::equals).isPresent()) {
+			return sendSubscriberSDP(sessionId, action, sdp);
+		}
+		return CompletableFuture.failedFuture(new ComponentException(Authorization.ITEM_NOT_FOUND));
+	}
+
 
 	protected int findSdpMLineIndex(JSEP jsep, String contentName) {
 		String[] lines = jsep.getSdp().split("\r\n");
@@ -168,9 +230,13 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 		if (candidate == null) {
 			return null;
 		}
+
+		String mid = Optional.ofNullable(janusCandidate.getMid())
+				.or(() -> sdp.getContents().stream().map(Content::getName).findFirst())
+				.get();
 		Optional<Transport> transport = sdp.getContents()
 				.stream()
-				.filter(c -> janusCandidate.getMid().equals(c.getName()))
+				.filter(c -> mid.equals(c.getName()))
 				.findFirst()
 				.flatMap(it -> it.getTransports().stream().findFirst());
 
@@ -178,9 +244,9 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 			return null;
 		}
 
-		return new Content(role, janusCandidate.getMid(), Optional.empty(), Optional.empty(),
-									  List.of(new Transport(transport.get().getUfrag(), transport.get().getPwd(),
-															List.of(candidate), Optional.empty())));
+		return new Content(role, mid, Optional.empty(), Optional.empty(),
+						   List.of(new Transport(transport.get().getUfrag(), transport.get().getPwd(),
+												 List.of(candidate), Optional.empty())));
 	}
 
 	public interface Listener {
@@ -217,6 +283,19 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 					return modify;
 				default:
 					return null;
+			}
+		}
+
+		public Action toJingleAction(Action defAction) {
+			switch (this) {
+				case add:
+					return Action.contentAdd;
+				case remove:
+					return Action.contentRemove;
+				case modify:
+					return Action.contentModify;
+				default:
+					return defAction;
 			}
 		}
 	}

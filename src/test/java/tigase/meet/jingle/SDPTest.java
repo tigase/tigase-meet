@@ -10,8 +10,7 @@ import org.junit.Test;
 
 import java.util.UUID;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.*;
 
 public class SDPTest {
 
@@ -51,6 +50,8 @@ public class SDPTest {
 		String sid = UUID.randomUUID().toString();
 		SDP sdp1 = SDP.from(SDPTest.TEST_STRING, Content.Creator.initiator);
 		assertNotNull(sdp1);
+		assertFalse(sdp1.getBundle().isEmpty());
+		assertFalse(sdp1.getContents().get(1).getDescription().get().getPayloads().get(0).getRtcpFeedback().isEmpty());
 		String sdpStr1 = sdp1.toString(sid);
 
 		SDP sdp2 = SDP.from(sdpStr1, Content.Creator.initiator);
@@ -58,6 +59,9 @@ public class SDPTest {
 		String sdpStr2 = sdp2.toString(sid);
 		
 		assertEquals(sdp2.getContents(), sdp2.getContents());
+		assertFalse(sdp2.getBundle().isEmpty());
+		assertFalse(sdp2.getContents().get(1).getDescription().get().getPayloads().get(0).getRtcpFeedback().isEmpty());
+
 		assertEquals(sdpStr2, sdpStr1);
 	}
 

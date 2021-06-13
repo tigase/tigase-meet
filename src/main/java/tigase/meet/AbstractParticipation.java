@@ -35,12 +35,16 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 		this.publisher.setListener(this);
 	}
 
+	public M getMeet() {
+		return meet;
+	}
+
 	@Override
 	public void addedPublishers(Collection<Publisher> publishers) {
 		subscriber.subscribe(publishers.stream()
 									 .map(p -> new JanusVideoRoomPlugin.Stream(p.getId(), null))
 									 .collect(Collectors.toList())).thenAccept(jsep -> {
-			System.out.println("received new SDP!");
+			receivedSubscriberSDP(jsep);
 		});
 	}
 
@@ -75,10 +79,14 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 
 	public synchronized CompletableFuture<Void> leave(Throwable ex) {
 		if (ex != null) {
-			log.log(Level.WARNING, ex, () -> "leaving due to error");
+			log.log(Level.WARNING, ex, () -> "participation " + toString() + " leaving due to error");
 		}
 		meet.left((P) this);
 		return CompletableFuture.allOf(publisher.leave()).thenCompose(x -> publisher.getSession().destroy());
 	}
 
+	@Override
+	public String toString() {
+		return "AbstractParticipation{" + "meet=" + meet + '}';
+	}
 }

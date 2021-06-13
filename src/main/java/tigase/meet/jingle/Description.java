@@ -121,6 +121,9 @@ public class Description {
 		Element el = new Element("description");
 		el.setXMLNS("urn:xmpp:jingle:apps:rtp:1");
 		el.setAttribute("media", media);
+		if (rtcpMux) {
+			el.addChild(new Element("rtcp-mux"));
+		}
 		ssrc.ifPresent(ssrc -> el.setAttribute("ssrc", ssrc));
 		payloads.stream().map(Payload::toElement).forEach(el::addChild);
 		if (!encryptions.isEmpty()) {

@@ -61,7 +61,7 @@ public class Meet extends AbstractMeet<Participation> {
 	}
 
 	public void left(Participation participation) {
-		this.participationByJid.remove(participation.getJid(), participation);
+		this.participationByJid.remove(participation.getJid());
 	}
 	
 }

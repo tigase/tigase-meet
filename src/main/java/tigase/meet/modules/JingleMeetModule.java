@@ -16,7 +16,6 @@ import tigase.meet.IMeetRepository;
 import tigase.meet.Meet;
 import tigase.meet.MeetComponent;
 import tigase.meet.Participation;
-import tigase.meet.janus.JSEP;
 import tigase.meet.jingle.Action;
 import tigase.meet.jingle.Candidate;
 import tigase.meet.jingle.Content;
@@ -79,7 +78,7 @@ public class JingleMeetModule extends AbstractModule {
 									public void receivedPublisherSDP(String sessionId, Participation.ContentAction contentAction,
 																	 SDP sdp) {
 										log.log(Level.FINEST, "received publisher SDP in listener");
-										sendJingle(meetJid, from, Action.sessionAccept, sessionId, sdp, participation);
+										sendJingle(meetJid, from, contentAction.toJingleAction(Action.sessionAccept), sessionId, sdp, participation);
 									}
 
 									@Override
@@ -119,8 +118,10 @@ public class JingleMeetModule extends AbstractModule {
 									} else {
 										log.log(Level.FINEST, "received publisher SDP in completion handler");
 										writer.write(packet.okResult((String) null, 0));
-										sendJingle(meetJid, from, Action.sessionAccept, sessionId,
-												   sdpAnswer, participation);
+
+										// Method `receivedPublisherSDP()` will be called and will take care of that..
+//										sendJingle(meetJid, from, Action.sessionAccept, sessionId,
+//												   sdpAnswer, participation);
 									}
 								});
 							});
@@ -130,7 +131,7 @@ public class JingleMeetModule extends AbstractModule {
 					case sessionAccept: {
 						withParticipation(meetJid, from, participation -> {
 							SDP sdp = SDP.from(jingleEl);
-							participation.sendSubscriberSDP(new JSEP(JSEP.Type.answer, sdp.toString("0")));
+							participation.sendSubscriberSDP(sessionId, Participation.ContentAction.init, sdp);
 							writer.write(packet.okResult((String) null, 0));
 						});
 						}
@@ -141,7 +142,7 @@ public class JingleMeetModule extends AbstractModule {
 						withParticipation(meetJid, from, participation -> {
 							SDP sdp = SDP.from(jingleEl);
 							Participation.ContentAction contentAction = Participation.ContentAction.fromJingleAction(action);
-							participation.sendPublisherSDP(sessionId, contentAction, sdp).whenComplete((sdpAnswer, ex) -> {
+							participation.updateSDP(sessionId, contentAction, sdp).whenComplete((sdpAnswer, ex) -> {
 								if (ex != null) {
 									participation.leave(ex);
 								}
@@ -150,6 +151,7 @@ public class JingleMeetModule extends AbstractModule {
 						});
 						break;
 					case transportInfo:
+						// we may need to delay processing of those requests until session-initiate is task is finished as in other case "participation" is not ready yet!
 						withParticipation(meetJid, from, participation -> {
 							for (Content content : Optional.ofNullable(jingleEl.getChildren())
 									.orElse(Collections.emptyList())
@@ -163,6 +165,7 @@ public class JingleMeetModule extends AbstractModule {
 									}
 								});
 							}
+							writer.write(packet.okResult((String) null, 0));
 						});
 						break;
 					case sessionTerminate:
@@ -194,8 +197,8 @@ public class JingleMeetModule extends AbstractModule {
 		});
 	}
 
-	private void sendJingle(BareJID from, JID to, Action action, String sessionId, SDP sdp, Participation participation) {
-		sendJingle(from, to, action,sessionId, sdp).whenComplete((x, ex) -> {
+	private CompletableFuture<Void> sendJingle(BareJID from, JID to, Action action, String sessionId, SDP sdp, Participation participation) {
+		return sendJingle(from, to, action,sessionId, sdp).whenComplete((x, ex) -> {
 			if (ex != null) {
 				participation.leave(ex);
 			} else {
@@ -204,59 +207,11 @@ public class JingleMeetModule extends AbstractModule {
 		});
 	}
 
-//	private void sendJingleTransportCandidate(BareJID from, JID to, String sessionId, Content.Creator role, JSEP jsep, JanusPlugin.Candidate janusCandidate) {
-//		Candidate candidate = Candidate.from(janusCandidate.getCandidate());
-//		if (candidate == null) {
-//			return;
-//		}
-//		SDP sdp = SDP.from(jsep.getSdp(), role);
-//		if (sdp == null) {
-//			return;
-//		}
-//		Optional<Transport> transport = sdp.getContents()
-//				.stream()
-//				.filter(c -> janusCandidate.getMid().equals(c.getName()))
-//				.findFirst()
-//				.flatMap(it -> it.getTransports().stream().findFirst());
-//
-//		if (transport.isEmpty()) {
-//			return;
-//		}
-//
-//		Content content = new Content(role, janusCandidate.getMid(), Optional.empty(),
-//									  List.of(new Transport(transport.get().getUfrag(), transport.get().getPwd(),
-//															List.of(candidate), Optional.empty())));
-//		sendJingle(from, to, JingleAction.transportInfo, sessionId, List.of(content), Collections.emptyList());
-//	}
-
 	private CompletableFuture<Void> sendJingle(BareJID from, JID to, Action action, String sessionId, SDP sdp) {
 		Element iqEl = new Element("iq");
 		iqEl.setAttribute("id", UUID.randomUUID().toString());
 		iqEl.setAttribute("type", StanzaType.set.name());
 		iqEl.addChild(sdp.toElement(action, sessionId, JID.jidInstanceNS(from)));
-//		iqEl.withElement("jingle", "urn:xmpp:jingle:1", jingleEl -> {
-//			jingleEl.setAttribute("action", action.getValue());
-//			jingleEl.setAttribute("sid", sessionId);
-//			switch (action) {
-//				case sessionInitiate:
-//					jingleEl.setAttribute("initiator", from.toString());
-//					break;
-//				case sessionAccept:
-//					jingleEl.setAttribute("responder", from.toString());
-//					break;
-//				default:
-//					break;
-//			}
-//			contents.stream().map(Content::toElement).forEach(jingleEl::addChild);
-//			if (!bundle.isEmpty()) {
-//				jingleEl.withElement("group", "urn:xmpp:jingle:apps:grouping:0", groupEl -> {
-//					groupEl.setAttribute("semantics", "BUNDLE");
-//					bundle.stream()
-//							.map(name -> new Element("content", new String[]{"name"}, new String[]{name}))
-//							.forEach(groupEl::addChild);
-//				});
-//			}
-//		});
 
 		CompletableFuture<Void> future = new CompletableFuture<>();
 		writer.write(new Iq(iqEl, JID.jidInstanceNS(from), to), new AsyncCallback() {

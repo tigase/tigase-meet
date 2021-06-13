@@ -216,7 +216,7 @@ public class Payload {
 
 		public Element toElement() {
 			Element el = new Element("rtcp-fb", new String[]{"xmlns", "type"},
-							   new String[]{"urn:xmpp:jingle:apps:rtp:rtcp-fb:01", type});
+							   new String[]{"urn:xmpp:jingle:apps:rtp:rtcp-fb:0", type});
 			subtype.ifPresent(subtype -> el.setAttribute("subtype", subtype));
 			return el;
 		}
