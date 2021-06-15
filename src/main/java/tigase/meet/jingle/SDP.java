@@ -137,6 +137,7 @@ public class SDP {
 
 	public SDP applyDiff(Participation.ContentAction action, SDP diff) {
 		switch (action) {
+			case accept:
 			case add:
 				return new SDP(this.id, Stream.concat(getContents().stream(), diff.getContents().stream())
 						.collect(Collectors.toList()), diff.getBundle());

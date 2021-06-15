@@ -139,8 +139,12 @@ public class JingleMeetModule extends AbstractModule {
 					case contentAdd:
 					case contentModify:
 					case contentRemove:
+					case contentAccept:
 						withParticipation(meetJid, from, participation -> {
 							SDP sdp = SDP.from(jingleEl);
+							if (sdp == null) {
+								return;
+							}
 							Participation.ContentAction contentAction = Participation.ContentAction.fromJingleAction(action);
 							participation.updateSDP(sessionId, contentAction, sdp).whenComplete((sdpAnswer, ex) -> {
 								if (ex != null) {

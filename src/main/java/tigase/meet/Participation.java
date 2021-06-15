@@ -269,7 +269,8 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 		init,
 		add,
 		remove,
-		modify;
+		modify,
+		accept;
 
 		public static ContentAction fromJingleAction(Action action) {
 			switch (action) {
@@ -281,6 +282,8 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 					return remove;
 				case contentModify:
 					return modify;
+				case contentAccept:
+					return accept;
 				default:
 					return null;
 			}
@@ -294,6 +297,8 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 					return Action.contentRemove;
 				case modify:
 					return Action.contentModify;
+				case accept:
+					return Action.contentAccept;
 				default:
 					return defAction;
 			}
