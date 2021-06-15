@@ -16,10 +16,7 @@ import tigase.meet.IMeetRepository;
 import tigase.meet.Meet;
 import tigase.meet.MeetComponent;
 import tigase.meet.Participation;
-import tigase.meet.jingle.Action;
-import tigase.meet.jingle.Candidate;
-import tigase.meet.jingle.Content;
-import tigase.meet.jingle.SDP;
+import tigase.meet.jingle.*;
 import tigase.server.Iq;
 import tigase.server.Packet;
 import tigase.util.stringprep.TigaseStringprepException;
@@ -75,7 +72,7 @@ public class JingleMeetModule extends AbstractModule {
 								participation.setListener(new Participation.Listener() {
 
 									@Override
-									public void receivedPublisherSDP(String sessionId, Participation.ContentAction contentAction,
+									public void receivedPublisherSDP(String sessionId, ContentAction contentAction,
 																	 SDP sdp) {
 										log.log(Level.FINEST, "received publisher SDP in listener");
 										sendJingle(meetJid, from, contentAction.toJingleAction(Action.sessionAccept), sessionId, sdp, participation);
@@ -92,7 +89,7 @@ public class JingleMeetModule extends AbstractModule {
 									}
 
 									@Override
-									public void receivedSubscriberSDP(String sessionId, Participation.ContentAction contentAction,
+									public void receivedSubscriberSDP(String sessionId, ContentAction contentAction,
 																	  SDP sdp) {
 										sendJingle(meetJid, from, contentAction.toJingleAction(Action.sessionInitiate), sessionId, sdp, participation);
 									}
@@ -111,7 +108,7 @@ public class JingleMeetModule extends AbstractModule {
 
 								participation.startPublisherSession(sessionId);
 								log.log(Level.FINEST, () -> "sending SDP to Janus: " + sdp.toString("0"));
-								participation.sendPublisherSDP(sessionId, Participation.ContentAction.init, sdp).whenComplete((sdpAnswer, ex) -> {
+								participation.sendPublisherSDP(sessionId, ContentAction.init, sdp).whenComplete((sdpAnswer, ex) -> {
 									if (ex != null) {
 										participation.leave(ex);
 										sendExeception(packet, new ComponentException(Authorization.NOT_ACCEPTABLE, ex.getMessage(), ex));
@@ -131,7 +128,7 @@ public class JingleMeetModule extends AbstractModule {
 					case sessionAccept: {
 						withParticipation(meetJid, from, participation -> {
 							SDP sdp = SDP.from(jingleEl);
-							participation.sendSubscriberSDP(sessionId, Participation.ContentAction.init, sdp);
+							participation.sendSubscriberSDP(sessionId, ContentAction.init, sdp);
 							writer.write(packet.okResult((String) null, 0));
 						});
 						}
@@ -145,7 +142,7 @@ public class JingleMeetModule extends AbstractModule {
 							if (sdp == null) {
 								return;
 							}
-							Participation.ContentAction contentAction = Participation.ContentAction.fromJingleAction(action);
+							ContentAction contentAction = ContentAction.fromJingleAction(action);
 							participation.updateSDP(sessionId, contentAction, sdp).whenComplete((sdpAnswer, ex) -> {
 								if (ex != null) {
 									participation.leave(ex);

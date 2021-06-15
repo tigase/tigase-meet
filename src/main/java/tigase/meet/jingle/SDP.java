@@ -6,7 +6,6 @@
  */
 package tigase.meet.jingle;
 
-import tigase.meet.Participation;
 import tigase.xml.Element;
 import tigase.xmpp.jid.JID;
 
@@ -135,7 +134,7 @@ public class SDP {
 		return lines.stream().collect(Collectors.joining("\r\n")) + "\r\n";
 	}
 
-	public SDP applyDiff(Participation.ContentAction action, SDP diff) {
+	public SDP applyDiff(ContentAction action, SDP diff) {
 		switch (action) {
 			case accept:
 			case add:
@@ -161,8 +160,8 @@ public class SDP {
 		throw new UnsupportedOperationException("Unsupported content action: " + action.name());
 	}
 
-	public Map<Participation.ContentAction,SDP> diffFrom(SDP oldSdp) {
-		Map<Participation.ContentAction,SDP> results = new HashMap<>();
+	public Map<ContentAction,SDP> diffFrom(SDP oldSdp) {
+		Map<ContentAction,SDP> results = new HashMap<>();
 		
 		List<String> oldContentNames = oldSdp.getContents().stream().map(Content::getName).collect(Collectors.toList());
 		List<String> newContentNames = getContents().stream().map(Content::getName).collect(Collectors.toList());
@@ -173,14 +172,14 @@ public class SDP {
 				.collect(Collectors.toList());
 		if (!contentsToRemove.isEmpty()) {
 			SDP sdp = new SDP(id, contentsToRemove.stream().map(Content::cloneHeaderOnly).collect(Collectors.toList()), this.getBundle());
-			results.put(Participation.ContentAction.remove, sdp);
+			results.put(ContentAction.remove, sdp);
 		}
 
 		List<Content> contentsToAdd = getContents().stream()
 				.filter(it -> !oldContentNames.contains(it.getName()))
 				.collect(Collectors.toList());
 		if (!contentsToAdd.isEmpty()) {
-			results.put(Participation.ContentAction.add, new SDP(id, contentsToAdd, this.getBundle()));
+			results.put(ContentAction.add, new SDP(id, contentsToAdd, this.getBundle()));
 		}
 
 		List<Content> contentsToModify = this.getContents()
@@ -194,7 +193,7 @@ public class SDP {
 				.map(Content::cloneHeaderOnly)
 				.collect(Collectors.toList());
 		if (!contentsToModify.isEmpty()) {
-			results.put(Participation.ContentAction.modify, new SDP(id, contentsToModify, Collections.emptyList()));
+			results.put(ContentAction.modify, new SDP(id, contentsToModify, Collections.emptyList()));
 		}
 
 		return results;

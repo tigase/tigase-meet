@@ -26,7 +26,6 @@ import tigase.kernel.core.Kernel;
 import tigase.meet.AbstractMeet;
 import tigase.meet.Meet;
 import tigase.meet.MeetRepository;
-import tigase.meet.Participation;
 import tigase.meet.jingle.*;
 import tigase.meet.modules.JingleMeetModule;
 import tigase.meet.utils.DelayedRunQueue;
@@ -365,7 +364,7 @@ public class MeetTest extends AbstractKernelTestCase {
 					SDP sdp = SDP.from(jingleEl);
 					if (sessionId.equals(publisherSession.get())) {
 						SDP oldSdp = SDP.from(publisherConnection.getRemoteDescription().sdp, Content.Creator.responder);
-						SDP newSdp = oldSdp.applyDiff(Participation.ContentAction.fromJingleAction(action), sdp);
+						SDP newSdp = oldSdp.applyDiff(ContentAction.fromJingleAction(action), sdp);
 						publisherConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, newSdp.toString("0")),
 																 new SetSessionDescriptionObserver() {
 																	 @Override
@@ -381,7 +380,7 @@ public class MeetTest extends AbstractKernelTestCase {
 					} else if (sessionId.equals(subscriberSession.get())) {
 						executor.execute(() -> {
 							SDP oldSdp = SDP.from(subscriberConnection.getRemoteDescription().sdp, Content.Creator.initiator);
-							SDP newSdp = oldSdp.applyDiff(Participation.ContentAction.fromJingleAction(action), sdp);
+							SDP newSdp = oldSdp.applyDiff(ContentAction.fromJingleAction(action), sdp);
 							subscriberConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, newSdp.toString("0")),
 																	  new SetSessionDescriptionObserver() {
 																		  @Override
@@ -397,7 +396,7 @@ public class MeetTest extends AbstractKernelTestCase {
 																																	subscriberConnection
 																																			.getCurrentLocalDescription().sdp,
 																																	Content.Creator.responder);
-																															Map<Participation.ContentAction, SDP> changes = SDP
+																															Map<ContentAction, SDP> changes = SDP
 																																	.from(rtcSessionDescription.sdp,
 																																		  Content.Creator.responder)
 																																	.diffFrom(
@@ -410,7 +409,7 @@ public class MeetTest extends AbstractKernelTestCase {
 																																			System.out
 																																					.println(
 																																							"local description success!");
-																																			for (Participation.ContentAction contentAction : Participation.ContentAction
+																																			for (ContentAction contentAction : ContentAction
 																																					.values()) {
 																																				SDP value = changes
 																																						.get(contentAction);

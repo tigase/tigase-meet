@@ -9,9 +9,11 @@ package tigase.meet.modules;
 import tigase.component.exceptions.ComponentException;
 import tigase.criteria.Criteria;
 import tigase.criteria.ElementCriteria;
+import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Inject;
 import tigase.meet.IMeetRepository;
 import tigase.meet.MediaType;
+import tigase.meet.MeetComponent;
 import tigase.server.Packet;
 import tigase.util.stringprep.TigaseStringprepException;
 import tigase.xml.Element;
@@ -24,6 +26,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Bean(name = "createMeetModule", parent = MeetComponent.class, active = true)
 public class CreateMeetModule extends AbstractModule {
 
 	private static final Criteria CRITERIA = ElementCriteria.nameType("iq", "set")
