@@ -12,10 +12,7 @@ import tigase.criteria.Criteria;
 import tigase.criteria.ElementCriteria;
 import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Inject;
-import tigase.meet.IMeetRepository;
-import tigase.meet.Meet;
-import tigase.meet.MeetComponent;
-import tigase.meet.Participation;
+import tigase.meet.*;
 import tigase.meet.jingle.*;
 import tigase.server.Iq;
 import tigase.server.Packet;
@@ -35,9 +32,25 @@ import java.util.stream.Collectors;
 public class JingleMeetModule extends AbstractModule {
 
 	private static final Criteria CRITERIA = ElementCriteria.name("iq").add(ElementCriteria.name("jingle", "urn:xmpp:jingle:1"));
-	
+
+	private static final String[] FEATURES = new String[]{"tigase:meet:0", "tigase:meet:0:media:audio",
+														  "tigase:meet:0:media:video", "urn:xmpp:jingle:1",
+														  "urn:xmpp:jingle:apps:rtp:1",
+														  "urn:xmpp:jingle:apps:rtp:audio",
+														  "urn:xmpp:jingle:apps:rtp:video",
+														  "urn:xmpp:jingle:transports:ice-udp:1",
+														  "urn:xmpp:jingle:apps:dtls:0"};
+
+	@Inject
+	private IMeetLogic logic;
+
 	@Inject
 	private IMeetRepository meetRepository;
+
+	@Override
+	public String[] getFeatures() {
+		return FEATURES;
+	}
 
 	@Override
 	public Criteria getModuleCriteria() {
@@ -45,7 +58,7 @@ public class JingleMeetModule extends AbstractModule {
 	}
 
 	@Override
-	public void process(Packet packet) throws ComponentException, TigaseStringprepException {
+	public CompletableFuture<Packet> processPacket(Packet packet) throws ComponentException, TigaseStringprepException {
 		if (StanzaType.set != packet.getType()) {
 			throw new ComponentException(Authorization.BAD_REQUEST);
 		}
@@ -67,93 +80,47 @@ public class JingleMeetModule extends AbstractModule {
 					case sessionInitiate: {
 						log.log(Level.FINEST, () -> "received session-initiate: " + jingleEl.toString());
 						SDP sdp = SDP.from(jingleEl);
-						this.withMeet(meetJid, meet -> {
-							meet.join(from).thenAccept(participation -> {
-								participation.setListener(new Participation.Listener() {
+						return withMeet(meetJid).thenCompose(meet -> logic.checkPermissionFuture(meet, from, IMeetLogic.Action.join)).thenCompose(meet -> meet.join(from)).thenCompose(participation -> {
+							participation.setListener(new ParticipationListener(meetJid, participation));
 
-									@Override
-									public void receivedPublisherSDP(String sessionId, ContentAction contentAction,
-																	 SDP sdp) {
-										log.log(Level.FINEST, "received publisher SDP in listener");
-										sendJingle(meetJid, from, contentAction.toJingleAction(Action.sessionAccept), sessionId, sdp, participation);
-									}
-
-									@Override
-									public void receivedPublisherCandidate(String sessionId, Content content) {
-										sendJingle(meetJid, from, Action.transportInfo, sessionId, new SDP("", List.of(content), Collections.emptyList()));
-									}
-
-									@Override
-									public void terminatedPublisherSession(String sessionId) {
-										sendJingle(meetJid, from, Action.sessionTerminate, sessionId, new SDP("", Collections.emptyList(), Collections.emptyList()));
-									}
-
-									@Override
-									public void receivedSubscriberSDP(String sessionId, ContentAction contentAction,
-																	  SDP sdp) {
-										sendJingle(meetJid, from, contentAction.toJingleAction(Action.sessionInitiate), sessionId, sdp, participation);
-									}
-
-									@Override
-									public void receivedSubscriberCandidate(String sessionId, Content content) {
-										sendJingle(meetJid, from, Action.transportInfo, sessionId, new SDP("", List.of(content),
-												   Collections.emptyList()));
-									}
-
-									@Override
-									public void terminatedSubscriberSession(String sessionId) {
-										sendJingle(meetJid, from, Action.sessionTerminate, sessionId, new SDP("", Collections.emptyList(), Collections.emptyList()));
-									}
-								});
-
-								participation.startPublisherSession(sessionId);
-								log.log(Level.FINEST, () -> "sending SDP to Janus: " + sdp.toString("0"));
-								participation.sendPublisherSDP(sessionId, ContentAction.init, sdp).whenComplete((sdpAnswer, ex) -> {
-									if (ex != null) {
-										participation.leave(ex);
-										sendExeception(packet, new ComponentException(Authorization.NOT_ACCEPTABLE, ex.getMessage(), ex));
-									} else {
-										log.log(Level.FINEST, "received publisher SDP in completion handler");
-										writer.write(packet.okResult((String) null, 0));
-
-										// Method `receivedPublisherSDP()` will be called and will take care of that..
-//										sendJingle(meetJid, from, Action.sessionAccept, sessionId,
-//												   sdpAnswer, participation);
-									}
-								});
-							});
-						});
-						}
-						break;
-					case sessionAccept: {
-						withParticipation(meetJid, from, participation -> {
-							SDP sdp = SDP.from(jingleEl);
-							participation.sendSubscriberSDP(sessionId, ContentAction.init, sdp);
-							writer.write(packet.okResult((String) null, 0));
-						});
-						}
-						break;
-					case contentAdd:
-					case contentModify:
-					case contentRemove:
-					case contentAccept:
-						withParticipation(meetJid, from, participation -> {
-							SDP sdp = SDP.from(jingleEl);
-							if (sdp == null) {
-								return;
-							}
-							ContentAction contentAction = ContentAction.fromJingleAction(action);
-							participation.updateSDP(sessionId, contentAction, sdp).whenComplete((sdpAnswer, ex) -> {
+							participation.startPublisherSession(sessionId);
+							log.log(Level.FINEST, () -> "sending SDP to Janus: " + sdp.toString("0"));
+							return participation.sendPublisherSDP(sessionId, ContentAction.init, sdp).thenApply(result -> {
+								log.log(Level.FINEST, "received publisher SDP in completion handler");
+								return packet.okResult((String) null, 0);
+							}).whenComplete((response, ex) -> {
 								if (ex != null) {
 									participation.leave(ex);
 								}
 							});
-							writer.write(packet.okResult((String) null, 0));
 						});
-						break;
+						}
+					case sessionAccept: {
+						return withParticipation(meetJid, from).thenApply(participation -> {
+							SDP sdp = SDP.from(jingleEl);
+							participation.sendSubscriberSDP(sessionId, ContentAction.init, sdp);
+							return packet.okResult((String) null, 0);
+						});
+						}
+					case contentAdd:
+					case contentModify:
+					case contentRemove:
+					case contentAccept:
+						return withParticipation(meetJid, from).thenApply(participation -> {
+							SDP sdp = SDP.from(jingleEl);
+							if (sdp != null) {
+								ContentAction contentAction = ContentAction.fromJingleAction(action);
+								participation.updateSDP(sessionId, contentAction, sdp).whenComplete((sdpAnswer, ex) -> {
+									if (ex != null) {
+										participation.leave(ex);
+									}
+								});
+							}
+							return packet.okResult((String) null, 0);
+						});
 					case transportInfo:
 						// we may need to delay processing of those requests until session-initiate is task is finished as in other case "participation" is not ready yet!
-						withParticipation(meetJid, from, participation -> {
+						return withParticipation(meetJid, from).thenApply(participation -> {
 							for (Content content : Optional.ofNullable(jingleEl.getChildren())
 									.orElse(Collections.emptyList())
 									.stream()
@@ -166,35 +133,36 @@ public class JingleMeetModule extends AbstractModule {
 									}
 								});
 							}
-							writer.write(packet.okResult((String) null, 0));
+							return packet.okResult((String) null, 0);
 						});
-						break;
 					case sessionTerminate:
-						withParticipation(meetJid, from, participation -> {
+						return withParticipation(meetJid, from).thenApply(participation -> {
 							// TODO: how to inform session that it was already closed on the remote end? so that it will not send termination request back?
 							participation.leave(null);
+							return packet.okResult((String) null, 0);
 						});
-						break;
 					default:
 						throw new ComponentException(Authorization.FEATURE_NOT_IMPLEMENTED);
 				}
-				break;
 			default:
 				throw new IllegalStateException("Unexpected value: " + packet.getType());
 		}
 	}
-	
-	private void withMeet(BareJID meetJid, ConsumerThrowingComponentException<Meet> consumer) throws ComponentException {
-		consumer.apply(meetRepository.getMeet(meetJid));
+
+	private CompletableFuture<Meet> withMeet(BareJID meetJid) throws ComponentException {
+		//consumer.apply(meetRepository.getMeet(meetJid));
+		return CompletableFuture.completedFuture(meetRepository.getMeet(meetJid));
 	}
 
-	private void withParticipation(BareJID meetJid, JID sender, ConsumerThrowingComponentException<Participation> consumer)
+	private CompletableFuture<Participation> withParticipation(BareJID meetJid, JID sender)
 			throws ComponentException {
-		withMeet(meetJid, meet -> {
-			Participation participation = Optional.ofNullable(meet.getParticipation(sender))
-					.orElseThrow(() -> new ComponentException(Authorization.ITEM_NOT_FOUND));
-
-			consumer.apply(participation);
+		return withMeet(meetJid).thenCompose(meet -> {
+			Participation participation = meet.getParticipation(sender);
+			if (participation == null)  {
+				return CompletableFuture.failedFuture(new ComponentException(Authorization.ITEM_NOT_FOUND));
+			} else {
+				return CompletableFuture.completedFuture(participation);
+			}
 		});
 	}
 
@@ -235,11 +203,49 @@ public class JingleMeetModule extends AbstractModule {
 		});
 		return future;
 	}
+	
+	private class ParticipationListener implements Participation.Listener {
 
-	@FunctionalInterface
-	public interface ConsumerThrowingComponentException<T> {
+		private final BareJID meetJid;
+		private final Participation participation;
 
-		void apply(T value) throws ComponentException;
+		public ParticipationListener(BareJID meetJid, Participation participation) {
+			this.meetJid = meetJid;
+			this.participation = participation;
+		}
 
+		@Override
+		public void receivedPublisherSDP(String sessionId, ContentAction contentAction,
+										 SDP sdp) {
+			log.log(Level.FINEST, "received publisher SDP in listener");
+			sendJingle(meetJid, participation.getJid(), contentAction.toJingleAction(Action.sessionAccept), sessionId, sdp, participation);
+		}
+
+		@Override
+		public void receivedPublisherCandidate(String sessionId, Content content) {
+			sendJingle(meetJid, participation.getJid(), Action.transportInfo, sessionId, new SDP("", List.of(content), Collections.emptyList()));
+		}
+
+		@Override
+		public void terminatedPublisherSession(String sessionId) {
+			sendJingle(meetJid, participation.getJid(), Action.sessionTerminate, sessionId, new SDP("", Collections.emptyList(), Collections.emptyList()));
+		}
+
+		@Override
+		public void receivedSubscriberSDP(String sessionId, ContentAction contentAction,
+										  SDP sdp) {
+			sendJingle(meetJid, participation.getJid(), contentAction.toJingleAction(Action.sessionInitiate), sessionId, sdp, participation);
+		}
+
+		@Override
+		public void receivedSubscriberCandidate(String sessionId, Content content) {
+			sendJingle(meetJid, participation.getJid(), Action.transportInfo, sessionId, new SDP("", List.of(content),
+																			   Collections.emptyList()));
+		}
+
+		@Override
+		public void terminatedSubscriberSession(String sessionId) {
+			sendJingle(meetJid, participation.getJid(), Action.sessionTerminate, sessionId, new SDP("", Collections.emptyList(), Collections.emptyList()));
+		}
 	}
 }

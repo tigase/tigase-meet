@@ -25,8 +25,15 @@ public class Meet extends AbstractMeet<Participation> {
 	// we should have maps for incoming and outgoing sessions!
 	private final ConcurrentHashMap<JID, Participation> participationByJid = new ConcurrentHashMap<>();
 
-	public Meet(JanusConnection janusConnection, Object roomId) {
+	private final BareJID jid;
+
+	public Meet(JanusConnection janusConnection, Object roomId, BareJID jid) {
 		super(janusConnection, roomId);
+		this.jid = jid;
+	}
+
+	public BareJID getJid() {
+		return jid;
 	}
 
 	public void allow(BareJID jid) {
@@ -37,6 +44,10 @@ public class Meet extends AbstractMeet<Participation> {
 		allowed.remove(jid);
 	}
 
+	public boolean isPublic() {
+		return isAllowed(ALLOW_EVERYONE);
+	}
+
 	public boolean isAllowed(BareJID jid) {
 		return allowed.contains(ALLOW_EVERYONE) || allowed.contains(jid);
 	}
@@ -45,10 +56,6 @@ public class Meet extends AbstractMeet<Participation> {
 		if (participationByJid.contains(jid)) {
 		    return CompletableFuture.failedFuture(new ComponentException(Authorization.CONFLICT));
 		}
-		if (!isAllowed(jid.getBareJID())) {
-			return CompletableFuture.failedFuture(new ComponentException(Authorization.NOT_ALLOWED));
-		}
-
 		return join((publisher, subscriber) -> new Participation(this, jid, publisher, subscriber)).whenComplete((participation, ex) -> {
 			if (ex == null) {
 				this.participationByJid.put(participation.getJid(), participation);

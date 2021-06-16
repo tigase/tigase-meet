@@ -53,7 +53,7 @@ Additionally, `<create/>` element should contain `<media/>` elements with `type`
 <iq type='set' id='create-1' to='meet.example.com'>
 	<create xmlns='tigase:meet:0'>
         <media type="audio" />
-        <media type="video"/>
+        <media type="video" />
 		<participant>user2@example.com</participant>
 		<participant>user3@example.com</participant>
   </create>

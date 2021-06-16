@@ -10,6 +10,7 @@ import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Initializable;
 import tigase.kernel.beans.UnregisterAware;
 import tigase.kernel.beans.config.ConfigField;
+import tigase.meet.MeetComponent;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLEngine;
@@ -28,7 +29,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-@Bean(name = "janus", active = true)
+@Bean(name = "janus", parent = MeetComponent.class, active = true)
 public class JanusService implements Initializable, UnregisterAware {
 	@ConfigField(desc = "URI for connect to Janus", alias = "uri")
 	private String uri;

@@ -8,6 +8,7 @@ package tigase.meet.janus;
 
 import org.junit.Assert;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import tigase.component.DSLBeanConfigurator;
 import tigase.conf.ConfigBuilder;
@@ -29,6 +30,7 @@ import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@Ignore
 public class JanusServiceTest extends AbstractKernelTestCase {
 
 	private static final String TEST_SDP = "v0=0\n" + "o=- 7748854561613975422 2 IN IP4 127.0.0.1\n" + "s=-\n" +

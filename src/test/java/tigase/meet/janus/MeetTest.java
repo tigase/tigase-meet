@@ -10,6 +10,7 @@ import dev.onvoid.webrtc.*;
 import dev.onvoid.webrtc.media.audio.AudioOptions;
 import dev.onvoid.webrtc.media.audio.AudioSource;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import tigase.component.DSLBeanConfigurator;
 import tigase.component.PacketWriter;
@@ -52,6 +53,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.Assert.*;
 
+@Ignore
 public class MeetTest extends AbstractKernelTestCase {
 
 	private static final Logger log = Logger.getLogger(MeetTest.class.getCanonicalName());
@@ -94,7 +96,7 @@ public class MeetTest extends AbstractKernelTestCase {
 		meetRepository = getInstance(MeetRepository.class);
 		jingleMeetModule = getKernel().getInstance(JingleMeetModule.class);
 		JanusService janusService = getInstance(JanusService.class);
-		Meet meet = new Meet(janusService.newConnection().get(), 1234l);
+		Meet meet = new Meet(janusService.newConnection().get(), 1234l, meetJid);
 		meet.allow(AbstractMeet.ALLOW_EVERYONE);
 		Field f = MeetRepository.class.getDeclaredField("meets");
 		f.setAccessible(true);

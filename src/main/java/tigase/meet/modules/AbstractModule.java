@@ -8,14 +8,35 @@ package tigase.meet.modules;
 
 import tigase.component.exceptions.ComponentException;
 import tigase.server.Packet;
+import tigase.util.stringprep.TigaseStringprepException;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.StanzaType;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 
 public abstract class AbstractModule extends tigase.component.modules.AbstractModule {
+
+	@Override
+	public void process(Packet packet) throws ComponentException, TigaseStringprepException {
+		processPacket(packet).whenComplete((result, ex) -> {
+			if (ex != null) {
+				sendExeception(packet, ex);
+			} else {
+				writer.write(result);
+			}
+		});
+	}
+
+	public abstract CompletableFuture<Packet> processPacket(Packet packet) throws ComponentException, TigaseStringprepException;
+
+	public ComponentException convertThrowable(Throwable ex) {
+		return (ex instanceof ComponentException)
+			   ? ((ComponentException) ex)
+			   : new ComponentException(Authorization.INTERNAL_SERVER_ERROR, ex.getMessage(), ex);
+	}
 
 	public void sendExeception(Packet packet, Throwable ex) {
 		try {
@@ -29,20 +50,14 @@ public abstract class AbstractModule extends tigase.component.modules.AbstractMo
 			}
 
 			this.log.log(Level.FINEST, () -> "Sending back exception for " + packet.toString() + ", exception:\n" + serializeException(ex));
-			ComponentException e = (ex instanceof ComponentException)
-								   ? ((ComponentException) ex)
-								   : new ComponentException(Authorization.INTERNAL_SERVER_ERROR, ex.getMessage(), ex);
 
-			Packet result = e.makeElement(packet, true);
+			Packet result = convertThrowable(ex).makeElement(packet, true);
 			if (this.log.isLoggable(Level.FINEST)) {
 				this.log.log(Level.FINEST, "Sending back: " + result.toString());
 			}
 
 			this.writer.write(result);
 		} catch (Exception var5) {
-			if (this.log.isLoggable(Level.WARNING)) {
-				this.log.log(Level.WARNING, "Problem during generate error response", var5);
-			}
 		}
 	}
 

@@ -14,7 +14,7 @@ public class CandidateTest {
 
 	@Test
 	public void fromSrflx() {
-		Candidate candidate = Candidate.from("candidate:4 1 udp 1679819007 46.171.244.86 64102 typ srflx raddr 172.17.0.2 rport 59706");
+		Candidate candidate = Candidate.from("candidate:4 1 udp 1679819007 10.2.0.2 64102 typ srflx raddr 172.17.0.2 rport 59706");
 		assertNotNull(candidate);
 	}
 }

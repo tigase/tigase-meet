@@ -10,6 +10,7 @@ import dev.onvoid.webrtc.*;
 import dev.onvoid.webrtc.media.audio.AudioOptions;
 import dev.onvoid.webrtc.media.audio.AudioSource;
 import org.junit.Before;
+import org.junit.Ignore;
 import org.junit.Test;
 import tigase.component.DSLBeanConfigurator;
 import tigase.conf.ConfigBuilder;
@@ -30,6 +31,7 @@ import java.util.logging.ConsoleHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+@Ignore
 public class AbstractMeetTest
 		extends AbstractKernelTestCase {
 
