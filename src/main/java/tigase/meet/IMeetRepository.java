@@ -13,8 +13,9 @@ import java.util.concurrent.CompletableFuture;
 
 public interface IMeetRepository {
 
-	CompletableFuture<Meet> create(BareJID jid) throws ComponentException;
+	CompletableFuture<Meet> create(BareJID jid);
 
 	Meet getMeet(BareJID jid) throws ComponentException;
 
+	void destroyed(BareJID jid);
 }

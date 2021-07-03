@@ -25,10 +25,12 @@ public class Meet extends AbstractMeet<Participation> {
 	// we should have maps for incoming and outgoing sessions!
 	private final ConcurrentHashMap<JID, Participation> participationByJid = new ConcurrentHashMap<>();
 
+	private final IMeetRepository repository;
 	private final BareJID jid;
 
-	public Meet(JanusConnection janusConnection, Object roomId, BareJID jid) {
+	public Meet(IMeetRepository repository, JanusConnection janusConnection, Object roomId, BareJID jid) {
 		super(janusConnection, roomId);
+		this.repository = repository;
 		this.jid = jid;
 	}
 
@@ -61,6 +63,11 @@ public class Meet extends AbstractMeet<Participation> {
 				this.participationByJid.put(participation.getJid(), participation);
 			}
 		});
+	}
+
+	@Override
+	public CompletableFuture<Void> destroy() {
+		return super.destroy().thenAccept(x -> repository.destroyed(jid));
 	}
 
 	public Participation getParticipation(JID jid) {

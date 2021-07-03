@@ -26,10 +26,11 @@ public class MeetRepository implements IMeetRepository {
 	private JanusService janusService;
 
 	@Override
-	public CompletableFuture<Meet> create(BareJID key) throws ComponentException {
+	public CompletableFuture<Meet> create(BareJID key) {
 		CompletableFuture<Meet> future = new CompletableFuture<>();
 		if (meets.putIfAbsent(key, future) != null) {
-			throw new ComponentException(Authorization.CONFLICT);
+			future.completeExceptionally(new ComponentException(Authorization.CONFLICT));
+			return future;
 		}
 
 		createMeet(key).whenComplete((room,ex) -> {
@@ -57,6 +58,11 @@ public class MeetRepository implements IMeetRepository {
 		throw new ComponentException(Authorization.ITEM_NOT_FOUND);
 	}
 
+	@Override
+	public void destroyed(BareJID jid) {
+		meets.remove(jid);
+	}
+
 	private CompletableFuture<Meet> createMeet(BareJID meetJid) {
 		return janusService.newConnection()
 				.thenCompose(connection -> connection.createSession()
@@ -65,7 +71,7 @@ public class MeetRepository implements IMeetRepository {
 								.exceptionallyCompose(
 										ex -> session.destroy().handle((x, ex1) -> CompletableFuture.failedFuture(ex))))
 						// we should close this session even it is not connected? or maybe we should store it?
-						.thenApply(roomId -> new Meet(connection, roomId, meetJid))
+						.thenApply(roomId -> new Meet(this, connection, roomId, meetJid))
 						.exceptionallyCompose(ex -> {
 							connection.close();
 							return CompletableFuture.failedFuture(ex);
