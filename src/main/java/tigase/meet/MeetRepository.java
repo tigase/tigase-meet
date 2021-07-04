@@ -17,7 +17,7 @@ import tigase.xmpp.jid.BareJID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Bean(name = "repository", parent = MeetComponent.class, active = true)
+@Bean(name = "meetRepository", parent = MeetComponent.class, active = true)
 public class MeetRepository implements IMeetRepository {
 
 	private final ConcurrentHashMap<BareJID, CompletableFuture<Meet>> meets = new ConcurrentHashMap<>();
