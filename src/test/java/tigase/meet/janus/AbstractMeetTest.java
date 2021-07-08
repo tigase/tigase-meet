@@ -24,6 +24,7 @@ import tigase.meet.janus.videoroom.JanusVideoRoomPlugin;
 import tigase.util.log.LogFormatter;
 
 import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.locks.ReentrantLock;
@@ -206,6 +207,17 @@ public class AbstractMeetTest
 			System.out.println("peer connection 2 state: " + subscriberConnection.getConnectionState() + ", " + subscriberConnection.getIceConnectionState() + "\n" + subscriberConnection.getCurrentLocalDescription() + "\n" + subscriberConnection.getCurrentRemoteDescription());
 			Thread.sleep(1000);
 		}
+	}
+
+	@Test
+	public void testList() throws InterruptedException {
+		 janusService.newConnection().thenAccept(conn -> {
+		 	conn.createSession().thenApply(session -> session.attachPlugin(JanusVideoRoomPlugin.class).thenApply(plugin -> plugin.execute(
+																																		  UUID.randomUUID().toString(), generator -> {
+						generator.writeStringField("request", "list");
+					}, null)));
+		 });
+		 Thread.sleep(10000);
 	}
 
 	public class MeetTest2 extends AbstractMeet<ParticipationWithListener> {

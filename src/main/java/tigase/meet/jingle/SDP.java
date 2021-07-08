@@ -147,7 +147,12 @@ public class SDP {
 				for (Content diffed : diff.getContents()) {
 					for (int i=0; i<contents.length; i++) {
 						if (contents[i].getName().equals(diffed.getName())) {
-							contents[i] = contents[i].withSenders(diffed.getSenders());
+							contents[i] = contents[i].withSenders(diffed.getSenders())
+									.withSSRCs(diffed.getDescription()
+													   .map(Description::getSsrcs)
+													   .orElse(Collections.emptyList()), diffed.getDescription()
+													   .map(Description::getSsrcGroups)
+													   .orElse(Collections.emptyList()));
 						}
 					}
 				}
@@ -190,7 +195,7 @@ public class SDP {
 						.filter(oldContent -> it.getSenders() != oldContent.getSenders())
 						.findFirst()
 						.isPresent())
-				.map(Content::cloneHeaderOnly)
+				.map(Content::cloneForModify)
 				.collect(Collectors.toList());
 		if (!contentsToModify.isEmpty()) {
 			results.put(ContentAction.modify, new SDP(id, contentsToModify, Collections.emptyList()));

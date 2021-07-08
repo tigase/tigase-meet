@@ -96,7 +96,7 @@ public class MeetTest extends AbstractKernelTestCase {
 		meetRepository = getInstance(MeetRepository.class);
 		jingleMeetModule = getKernel().getInstance(JingleMeetModule.class);
 		JanusService janusService = getInstance(JanusService.class);
-		Meet meet = new Meet(janusService.newConnection().get(), 1234l, meetJid);
+		Meet meet = new Meet(meetRepository, janusService.newConnection().get(), 1234l, meetJid);
 		meet.allow(AbstractMeet.ALLOW_EVERYONE);
 		Field f = MeetRepository.class.getDeclaredField("meets");
 		f.setAccessible(true);

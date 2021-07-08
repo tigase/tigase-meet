@@ -117,6 +117,14 @@ public class Description {
 		return hdrExts;
 	}
 
+	public Description cloneWithSSRCsOnly() {
+		return new Description(media, ssrc, Collections.emptyList(), Optional.empty(), Collections.emptyList(), false, ssrcs, ssrcGroups, Collections.emptyList());
+	}
+
+	public Description withSSRCs(List<SSRC> ssrcs, List<SSRCGroup> ssrcGroups) {
+		return new Description(media, ssrc, payloads, bandwidth,encryptions,rtcpMux,ssrcs, ssrcGroups, hdrExts);
+	}      
+
 	public Element toElement() {
 		Element el = new Element("description");
 		el.setXMLNS("urn:xmpp:jingle:apps:rtp:1");

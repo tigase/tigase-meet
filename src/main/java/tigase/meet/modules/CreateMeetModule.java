@@ -82,7 +82,8 @@ public class CreateMeetModule extends AbstractModule {
 			for (BareJID jid : allowed) {
 				meet.allow(jid);
 			}
-			Element resultCreateElem = new Element("create", "tigase:meet:0");
+			Element resultCreateElem = new Element("create" );
+			resultCreateElem.setXMLNS("tigase:meet:0");
 			resultCreateElem.setAttribute("id", meet.getJid().getLocalpart());
 			return packet.okResult(resultCreateElem, 0);
 		});

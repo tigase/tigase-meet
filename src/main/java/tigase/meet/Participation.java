@@ -155,6 +155,9 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 				SDP sdp = results.get(action);
 				if (sdp != null) {
 					listener.receivedSubscriberSDP(sessionId, action, sdp);
+					if (action == ContentAction.modify)  {
+						sendSubscriberSDP(remoteSubscriberSDP);
+					}
 				}
 			}
 		}

@@ -192,8 +192,16 @@ public class Content {
 		return new Content(creator, name, senders, Optional.empty(), Collections.emptyList());
 	}
 
+	public Content cloneForModify() {
+		return new Content(creator, name, senders, description.map(Description::cloneWithSSRCsOnly), Collections.emptyList());
+	}
+
 	public Content withSenders(Senders senders) {
 		return new Content(creator, name, Optional.ofNullable(senders), description, transports);
+	}
+
+	public Content withSSRCs(List<SSRC> ssrcs, List<SSRCGroup> ssrcGroups) {
+		return new Content(creator, name, senders, description.map(desc -> desc.withSSRCs(ssrcs, ssrcGroups)), transports);
 	}
 
 	public enum StreamType {

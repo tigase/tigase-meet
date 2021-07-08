@@ -162,6 +162,9 @@ public class LocalSubscriber {
 	public void handleEvent(JanusVideoRoomPlugin.Content content) {
 		if ("updated".equals(content.getVideoRoom()) && content.data.containsKey("streams")) {
 			log.log(Level.FINER, () -> toString() + " updated subscribed streams: " + content.data.get("streams"));
+			if (content.jsep != null) {
+				listener.receivedSubscriberSDP(content.jsep);
+			}
 		}
 	}
 
