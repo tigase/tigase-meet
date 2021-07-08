@@ -47,6 +47,9 @@ public class JingleMeetModule extends AbstractModule {
 	@Inject
 	private IMeetRepository meetRepository;
 
+	@Inject
+	private IPresenceRepository presenceRepository;
+
 	@Override
 	public String[] getFeatures() {
 		return FEATURES;
@@ -76,6 +79,9 @@ public class JingleMeetModule extends AbstractModule {
 
 		switch (packet.getType()) {
 			case set:
+				if (!presenceRepository.isAvailable(meetJid, from)) {
+					throw new ComponentException(Authorization.NOT_ALLOWED, "Meet is not aware of your presence!");
+				}
 				switch (action) {
 					case sessionInitiate: {
 						log.log(Level.FINEST, () -> "received session-initiate: " + jingleEl.toString());

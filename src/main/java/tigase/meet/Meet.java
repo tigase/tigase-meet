@@ -8,6 +8,7 @@ package tigase.meet;
 
 import tigase.component.exceptions.ComponentException;
 import tigase.meet.janus.JanusConnection;
+import tigase.util.common.TimerTask;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.BareJID;
 import tigase.xmpp.jid.JID;
@@ -25,13 +26,17 @@ public class Meet extends AbstractMeet<Participation> {
 	// we should have maps for incoming and outgoing sessions!
 	private final ConcurrentHashMap<JID, Participation> participationByJid = new ConcurrentHashMap<>();
 
-	private final IMeetRepository repository;
+	private final MeetRepository repository;
 	private final BareJID jid;
 
-	public Meet(IMeetRepository repository, JanusConnection janusConnection, Object roomId, BareJID jid) {
+	private TimerTask timeoutTask;
+
+	public Meet(MeetRepository repository, JanusConnection janusConnection, Object roomId, BareJID jid) {
 		super(janusConnection, roomId);
 		this.repository = repository;
 		this.jid = jid;
+
+		this.timeoutTask = this.repository.scheduleJoinTimeoutTask(this);
 	}
 
 	public BareJID getJid() {
@@ -61,13 +66,16 @@ public class Meet extends AbstractMeet<Participation> {
 		return join((publisher, subscriber) -> new Participation(this, jid, publisher, subscriber)).whenComplete((participation, ex) -> {
 			if (ex == null) {
 				this.participationByJid.put(participation.getJid(), participation);
+				this.cancelTimeoutTask();
 			}
 		});
 	}
 
 	@Override
 	public CompletableFuture<Void> destroy() {
-		return super.destroy().thenAccept(x -> repository.destroyed(jid));
+		return super.destroy().thenAccept(x -> repository.destroyed(jid)).thenAccept(x -> {
+			this.cancelTimeoutTask();
+		});
 	}
 
 	public Participation getParticipation(JID jid) {
@@ -76,6 +84,20 @@ public class Meet extends AbstractMeet<Participation> {
 
 	public void left(Participation participation) {
 		this.participationByJid.remove(participation.getJid());
+		if (this.participationByJid.isEmpty()) {
+			destroy();
+		}
 	}
-	
+
+	public boolean hasParticipants() {
+		return !this.participationByJid.isEmpty();
+	}
+
+	private synchronized void cancelTimeoutTask() {
+		TimerTask timerTask = this.timeoutTask;
+		this.timeoutTask = null;
+		if (timerTask != null) {
+			timerTask.cancel();
+		}
+	}
 }

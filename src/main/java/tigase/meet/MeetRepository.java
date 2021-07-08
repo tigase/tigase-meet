@@ -11,6 +11,8 @@ import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Inject;
 import tigase.meet.janus.JanusService;
 import tigase.meet.janus.videoroom.JanusVideoRoomPlugin;
+import tigase.server.AbstractMessageReceiver;
+import tigase.util.common.TimerTask;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.BareJID;
 
@@ -22,8 +24,12 @@ public class MeetRepository implements IMeetRepository {
 
 	private final ConcurrentHashMap<BareJID, CompletableFuture<Meet>> meets = new ConcurrentHashMap<>();
 
+	@Inject(bean = "service")
+	private AbstractMessageReceiver component;
 	@Inject
 	private JanusService janusService;
+	@Inject(nullAllowed = true)
+	private PresenceCollectorRepository presenceCollectorRepository;
 
 	@Override
 	public CompletableFuture<Meet> create(BareJID key) {
@@ -33,12 +39,15 @@ public class MeetRepository implements IMeetRepository {
 			return future;
 		}
 
-		createMeet(key).whenComplete((room,ex) -> {
+		createMeet(key).whenComplete((meet,ex) -> {
 			if (ex != null) {
 				meets.remove(key, future);
 				future.completeExceptionally(ex);
 			} else {
-				future.complete(room);
+				if (presenceCollectorRepository != null) {
+					presenceCollectorRepository.meetCreated(meet.getJid());
+				}
+				future.complete(meet);
 			}
 		});
 				
@@ -61,6 +70,9 @@ public class MeetRepository implements IMeetRepository {
 	@Override
 	public void destroyed(BareJID jid) {
 		meets.remove(jid);
+		if (presenceCollectorRepository != null) {
+			presenceCollectorRepository.meetDestroyed(jid);
+		}
 	}
 
 	private CompletableFuture<Meet> createMeet(BareJID meetJid) {
@@ -76,5 +88,18 @@ public class MeetRepository implements IMeetRepository {
 							connection.close();
 							return CompletableFuture.failedFuture(ex);
 						}));
+	}
+
+	protected TimerTask scheduleJoinTimeoutTask(Meet meet) {
+		TimerTask timerTask = new TimerTask() {
+			@Override
+			public void run() {
+				if (!meet.hasParticipants()) {
+					meet.destroy();
+				}
+			}
+		};
+		component.addTimerTask(timerTask, 5 * 60 * 1000);
+		return timerTask;
 	}
 }

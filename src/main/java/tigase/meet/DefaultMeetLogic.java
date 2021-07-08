@@ -7,17 +7,25 @@
 package tigase.meet;
 
 import tigase.component.exceptions.ComponentException;
+import tigase.eventbus.EventBus;
+import tigase.eventbus.HandleEvent;
 import tigase.kernel.beans.Bean;
+import tigase.kernel.beans.Initializable;
 import tigase.kernel.beans.Inject;
+import tigase.kernel.beans.UnregisterAware;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.BareJID;
 import tigase.xmpp.jid.JID;
 
 @Bean(name = "meetLogic", parent = MeetComponent.class, active = true)
-public class DefaultMeetLogic implements IMeetLogic {
+public class DefaultMeetLogic implements IMeetLogic, Initializable, UnregisterAware {
 
 	@Inject(bean = "service")
 	private MeetComponent meetComponent;
+	@Inject
+	private EventBus eventBus;
+	@Inject
+	private IMeetRepository meetRepository;
 
 	@Override
 	public void checkCreatePermission(BareJID meetJid, JID senderJID) throws ComponentException {
@@ -34,6 +42,29 @@ public class DefaultMeetLogic implements IMeetLogic {
 			if (!meet.isAllowed(senderJID.getBareJID())) {
 				throw new ComponentException(Authorization.FORBIDDEN, "You are not authorized to " + action + " this meeting.");
 			}
+		}
+	}
+
+	@Override
+	public void initialize() {
+		eventBus.registerAll(this);
+	}
+
+	@Override
+	public void beforeUnregister() {
+		eventBus.unregisterAll(this);
+	}
+
+	@HandleEvent
+	public void userDisappeared(IPresenceRepository.UserDisappearedEvent event) {
+		try {
+			Meet meet = meetRepository.getMeet(event.getMeetJid());
+			Participation participation = meet.getParticipation(event.getJid());
+			if (participation != null) {
+				participation.leave(null);
+			}
+		} catch (ComponentException ex) {
+			
 		}
 	}
 }
