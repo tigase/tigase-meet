@@ -114,6 +114,42 @@ Client will respond with a `<message/>` of the same type as invitation with `<re
 ````
 
 **NOTE:** Clients should listen for those message-based invitations using carbons as they do for Jingle Message Initiation and act in the same way, so that accepting a call on a single client would silence other clients of the same user.
+                                   
+#### 3.2.6. Notifications about video publishers
+Meet component will notify joined meet participant about other meet participants joining or leaving video call (starting to publish or stopping to publish).
+
+##### 3.2.6.1. Notifying about new publisher
+Meet component will send `<iq/>` stanza of type `set` to the client with `<joined/>` element qualified by `tigase:meet:0` namespace. This element should contain one or more `<publisher/>` elements describing publishers for each publisher joining the call.
+Each `publisher` element MUST contain `jid` attribute with a bare JID of a participant joining the call. `publisher` element MUST contain one or more `<stream>` elements with `mid` attribute containing `mid` of a Jingle content which contains audio/video/data streams sent by participant.
+
+````xml
+<iq type='set' to='user2@example.com'>
+    <joined xmlns='tigase:meet:0'>
+        <participant jid='user@example.com'>
+            <stream mid='0' />
+            <stream mid='1' />
+        </participant>
+    </joined>
+</iq>
+````
+**NOTE:** Notifications about participants will not cover participant himself. There will be no notification about participant `user@example.com` sent to participant `user@example.com`.
+
+##### 3.2.6.2. Notifying about gone publisher
+
+Meet component will send `<iq/>` stanza of type `set` to the client with `<left/>` element qualified by `tigase:meet:0` namespace. This element should contain one or more `<publisher/>` elements describing publishers for each publisher joining the call.
+Each `publisher` element MUST contain `jid` attribute with a bare JID of a participant joining the call. `publisher` element MUST contain one or more `<stream>` elements with `mid` attribute containing `mid` of a Jingle content which contains audio/video/data streams sent by participant.
+
+````xml
+<iq type='set' to='user2@example.com'>
+    <left xmlns='tigase:meet:0'>
+        <participant jid='user@example.com'>
+            <stream mid='0' />
+            <stream mid='1' />
+        </participant>
+    </left>
+</iq>
+````
+**NOTE:** Notifications about participants will not cover participant himself. There will be no notification about participant `user@example.com` sent to participant `user@example.com`.
 
 ## 4. TODOs
 
@@ -121,6 +157,6 @@ Client will respond with a `<message/>` of the same type as invitation with `<re
 2. ~~Should we kick out people, when they are kicked out from the channel/room? or i other cases as well?~~ People should be kicked out of the group call when they leave the channel.
 3. We should consider a feature of manual "destruction" of the ad-hoc group call.
 4. We should consider to allow inviting or kicking out people from the call.
-5. It would be useful to add "metadata" exchange, so clients would know which A/V stream is sent by which participant (which bare JID).
+5. ~~It would be useful to add "metadata" exchange, so clients would know which A/V stream is sent by which participant (which bare JID).~~ Added with [`<joined/>`](#3261-notifying-about-new-publisher) and [`<left/>`](#3262-notifying-about-gone-publisher) 
 6. Verify that usage of `tigase:meet:0:media:audio` is a good idea for versioned features.
 

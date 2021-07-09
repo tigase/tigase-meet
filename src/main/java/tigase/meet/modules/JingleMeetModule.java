@@ -13,6 +13,7 @@ import tigase.criteria.ElementCriteria;
 import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Inject;
 import tigase.meet.*;
+import tigase.meet.janus.videoroom.Publisher;
 import tigase.meet.jingle.*;
 import tigase.server.Iq;
 import tigase.server.Packet;
@@ -209,7 +210,29 @@ public class JingleMeetModule extends AbstractModule {
 		});
 		return future;
 	}
-	
+
+	private void sendPublishers(BareJID from, JID to, String action, Collection<Publisher> joined) {
+		Element iqEl = new Element("iq");
+		iqEl.setAttribute("id", UUID.randomUUID().toString());
+		iqEl.setAttribute("type", StanzaType.set.name());
+
+		Element joinedEl = new Element(action);
+		joinedEl.setXMLNS("tigase:meet:0");
+
+		joined.stream().map(publisher -> {
+			Element publisherEl = new Element("publisher");
+			publisherEl.setAttribute("jid", publisher.getDisplay());
+			publisher.getStreams()
+					.stream()
+					.map(stream -> new Element("stream", new String[]{"mid"}, new String[]{stream.getMid()})).forEach(publisherEl::addChild);
+			return publisherEl;
+		}).forEach(joinedEl::addChild);
+
+		iqEl.addChild(joinedEl);
+
+		writer.write(Packet.packetInstance(iqEl, JID.jidInstanceNS(from), to));
+	}
+
 	private class ParticipationListener implements Participation.Listener {
 
 		private final BareJID meetJid;
@@ -218,6 +241,16 @@ public class JingleMeetModule extends AbstractModule {
 		public ParticipationListener(BareJID meetJid, Participation participation) {
 			this.meetJid = meetJid;
 			this.participation = participation;
+		}
+
+		@Override
+		public void publishersJoined(Collection<Publisher> publishers) {
+			sendPublishers(meetJid, participation.getJid(), "joined", publishers);
+		}
+
+		@Override
+		public void publishersLeft(Collection<Publisher> publishers) {
+			sendPublishers(meetJid, participation.getJid(), "left", publishers);
 		}
 
 		@Override

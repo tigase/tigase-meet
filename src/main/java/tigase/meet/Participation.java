@@ -11,16 +11,15 @@ import tigase.meet.janus.JSEP;
 import tigase.meet.janus.JanusPlugin;
 import tigase.meet.janus.videoroom.LocalPublisher;
 import tigase.meet.janus.videoroom.LocalSubscriber;
+import tigase.meet.janus.videoroom.Publisher;
 import tigase.meet.jingle.*;
 import tigase.meet.utils.DelayedRunQueue;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.JID;
 
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -39,9 +38,26 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	private final DelayedRunQueue cachedLocalPublisherCandidatesQueue = new DelayedRunQueue();
 	private final DelayedRunQueue cachedLocalSubscriberCandidatesQueue = new DelayedRunQueue();
 
+	private CopyOnWriteArrayList<Publisher> publishers = new CopyOnWriteArrayList<>();
 
 	public Participation(Meet meet, JID jid, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		super(meet, jid, localPublisher, localSubscriber);
+	}
+
+	@Override
+	public void addedPublishers(Collection<Publisher> publishers) {
+		this.publishers.addAll(publishers);
+		this.listener.publishersJoined(publishers);
+		super.addedPublishers(publishers);
+	}
+
+	@Override
+	public void removedPublishers(long publisherId) {
+		this.publishers.stream().filter(publisher -> publisher.getId() == publisherId).findFirst().ifPresent(publisher -> {
+			this.listener.publishersLeft(Collections.singletonList(publisher));
+			this.publishers.remove(publisher);
+		});
+		super.removedPublishers(publisherId);
 	}
 
 	public synchronized void terminateSubscriberSession() {
@@ -253,6 +269,10 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	}
 
 	public interface Listener {
+
+		void publishersJoined(Collection<Publisher> joined);
+
+		void publishersLeft(Collection<Publisher> left);
 
 		void receivedPublisherSDP(String sessionId, ContentAction action, SDP sdp);
 

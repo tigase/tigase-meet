@@ -100,11 +100,14 @@ public class JanusVideoRoomPlugin extends JanusPlugin<JanusVideoRoomPlugin.Conte
 		});
 	}
 
-	public CompletableFuture<LocalPublisher> createPublisher(Object roomId) {
+	public CompletableFuture<LocalPublisher> createPublisher(Object roomId, String displayName) {
 		String transaction = getSession().nextTransactionId();
 		log.log(Level.FINER, () -> toString() + ", transaction " + transaction + ", joining as publisher..");
 		return execute("join", transaction, roomId, generator -> {
 			generator.writeStringField("ptype", "publisher");
+			if (displayName != null) {
+				generator.writeStringField("display", displayName);
+			}
 		}, null).thenApply(data -> {
 			if ("joined".equals(data.getVideoRoom())) {
 				return LocalPublisher.fromData(data.data, this, roomId);

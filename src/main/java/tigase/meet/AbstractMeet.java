@@ -36,9 +36,9 @@ public abstract class AbstractMeet<T extends AbstractParticipation> {
 		return janusConnection;
 	}
 
-	protected CompletableFuture<T> join(BiFunction<LocalPublisher, LocalSubscriber, T> participationConstructor) {
+	protected CompletableFuture<T> join(String displayName, BiFunction<LocalPublisher, LocalSubscriber, T> participationConstructor) {
 		return janusConnection.createSession()
-				.thenCompose(session -> this.createParticipation(session, participationConstructor)
+				.thenCompose(session -> this.createParticipation(session, displayName, participationConstructor)
 						.whenComplete((x, ex1) -> {
 							if (ex1 != null) {
 								session.destroy();
@@ -46,9 +46,9 @@ public abstract class AbstractMeet<T extends AbstractParticipation> {
 						}));
 	}
 
-	protected CompletableFuture<T> createParticipation(JanusSession session, BiFunction<LocalPublisher, LocalSubscriber, T> participationConstructor) {
+	protected CompletableFuture<T> createParticipation(JanusSession session, String displayName, BiFunction<LocalPublisher, LocalSubscriber, T> participationConstructor) {
 		CompletableFuture<LocalPublisher> localPublisherFuture = session.attachPlugin(JanusVideoRoomPlugin.class)
-				.thenCompose(plugin -> plugin.createPublisher(roomId));
+				.thenCompose(plugin -> plugin.createPublisher(roomId, displayName));
 		CompletableFuture<LocalSubscriber> localSubscriberFuture = session.attachPlugin(JanusVideoRoomPlugin.class)
 				.thenApply(plugin -> plugin.createSubscriber(roomId));
 		return localPublisherFuture.thenCombineAsync(localSubscriberFuture, participationConstructor);

@@ -63,7 +63,7 @@ public class Meet extends AbstractMeet<Participation> {
 		if (participationByJid.contains(jid)) {
 		    return CompletableFuture.failedFuture(new ComponentException(Authorization.CONFLICT));
 		}
-		return join((publisher, subscriber) -> new Participation(this, jid, publisher, subscriber)).whenComplete((participation, ex) -> {
+		return join(jid.getBareJID().toString(), (publisher, subscriber) -> new Participation(this, jid, publisher, subscriber)).whenComplete((participation, ex) -> {
 			if (ex == null) {
 				this.participationByJid.put(participation.getJid(), participation);
 				this.cancelTimeoutTask();

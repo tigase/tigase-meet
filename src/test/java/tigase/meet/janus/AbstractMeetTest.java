@@ -70,7 +70,7 @@ public class AbstractMeetTest
 	public void test() throws ExecutionException, InterruptedException {
 		MeetTest2 meet = new MeetTest2(janusService.newConnection().get(), 1234l);
 
-		ParticipationWithListener participation = meet.join().get();
+		ParticipationWithListener participation = meet.join("Publisher name").get();
 //		CompletableFuture<Meet.Participation> participantFuture2 = meet.join();
 //		CompletableFuture<Meet.Participation> participantFuture3 = meet.join();
 //		CompletableFuture.allOf(participantFuture1, participantFuture2, participantFuture3).get();
@@ -231,8 +231,8 @@ public class AbstractMeetTest
 
 		}
 
-		public CompletableFuture<ParticipationWithListener> join() {
-			return join(((publisher, subscriber) -> new ParticipationWithListener(this, publisher, subscriber)));
+		public CompletableFuture<ParticipationWithListener> join(String displayName) {
+			return join(displayName, ((publisher, subscriber) -> new ParticipationWithListener(this, publisher, subscriber)));
 		}
 
 	}

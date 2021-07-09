@@ -102,8 +102,8 @@ public class JanusServiceTest extends AbstractKernelTestCase {
 			//room = new JanusVideoRoom(plugin, 1234l);
 		}
 
-		LocalPublisher localPublisher2 = plugin2.createPublisher(roomId).get();
-		LocalPublisher localPublisher1 = plugin1.createPublisher(roomId).get();
+		LocalPublisher localPublisher2 = plugin2.createPublisher(roomId, "Local publisher 1").get();
+		LocalPublisher localPublisher1 = plugin1.createPublisher(roomId, "Local publisher 2").get();
 
 		Thread.sleep(400);
 
