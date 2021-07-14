@@ -52,7 +52,9 @@ public class DefaultMeetLogic implements IMeetLogic, Initializable, UnregisterAw
 
 	@Override
 	public void beforeUnregister() {
-		eventBus.unregisterAll(this);
+		if (eventBus != null) {
+			eventBus.unregisterAll(this);
+		}
 	}
 
 	@HandleEvent

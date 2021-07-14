@@ -18,6 +18,7 @@ import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -33,6 +34,7 @@ public class JanusConnection implements WebSocket.Listener {
 	private ConcurrentHashMap<String, CompletableFuture<Map<String,Object>>> executeTransactions = new ConcurrentHashMap<>();
 	private ConcurrentHashMap<Long, JanusSession> activeSessions = new ConcurrentHashMap<>();
 
+	private final ExecutorService executor = Executors.newSingleThreadExecutor();
 	private final JanusPluginsRegister pluginsRegister;
 	private final ScheduledExecutorService executorService;
 	private final Duration sessionTimeout;
@@ -45,7 +47,7 @@ public class JanusConnection implements WebSocket.Listener {
 
 	public void close() {
 		CompletableFuture.allOf(activeSessions.values().stream().map(session -> session.destroy()).toArray(CompletableFuture[]::new)).handle( (x, ex) -> {
-			return webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "ok");
+			return withContext(webSocket -> webSocket.sendClose(WebSocket.NORMAL_CLOSURE, "ok"));
 		});
 	}
 
@@ -146,11 +148,27 @@ public class JanusConnection implements WebSocket.Listener {
 		generator.close();
 		String str = w.toString();
 		log.log(Level.FINEST, () -> logPrefix() + ", sending request: " + str);
-		webSocket.sendText(str, true).get();
+		withContext(webSocket -> {
+			return webSocket.sendText(str, true);
+		}).get();
 	}
 
 	public String logPrefix() {
 		return "connection " + getId();
+	}
+
+	private <T> CompletableFuture<T> withContext(Function<WebSocket, CompletableFuture<T>> function) {
+		CompletableFuture<T> future = new CompletableFuture<>();
+		executor.execute(() -> {
+			function.apply(webSocket).whenComplete((result, ex) -> {
+				if (ex != null) {
+					future.completeExceptionally(ex);
+				} else {
+					future.complete(result);
+				}
+			});
+		});
+		return future;
 	}
 
 	@FunctionalInterface
