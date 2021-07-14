@@ -14,7 +14,7 @@ import tigase.kernel.beans.selector.ConfigType;
 import tigase.kernel.beans.selector.ConfigTypeEnum;
 import tigase.kernel.core.Kernel;
 
-@Bean(name = "meet", parent = Kernel.class, active = true)
+@Bean(name = "meet", parent = Kernel.class, active = false)
 @ConfigType(ConfigTypeEnum.DefaultMode)
 @ClusterModeRequired(active = false)
 public class MeetComponent extends AbstractKernelBasedComponent {

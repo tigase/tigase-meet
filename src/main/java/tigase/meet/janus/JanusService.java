@@ -10,6 +10,8 @@ import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Initializable;
 import tigase.kernel.beans.UnregisterAware;
 import tigase.kernel.beans.config.ConfigField;
+import tigase.licence.LicenceChecker;
+import tigase.licence.LicenceCheckerUpdateCallbackImpl;
 import tigase.meet.MeetComponent;
 
 import javax.net.ssl.SSLContext;
@@ -41,8 +43,17 @@ public class JanusService implements Initializable, UnregisterAware {
 	private JanusPluginsRegister pluginsRegister = new JanusPluginsRegister();
 	private ScheduledExecutorService executorService;
 
+	private LicenceChecker licenceChecker;
+
 	@Override
 	public void initialize() {
+		licenceChecker = LicenceChecker.getLicenceChecker("acs", new LicenceCheckerUpdateCallbackImpl("acs") {
+			@Override
+			public String getMissingLicenseWarning() {
+				// FIXME: need a proper warning!!
+				return super.getMissingLicenseWarning();
+			}
+		});
 		try {
 			SSLContext sslContext = SSLContext.getInstance("TLS");
 			sslContext.init(null, new TrustManager[] {
