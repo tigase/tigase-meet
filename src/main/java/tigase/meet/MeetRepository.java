@@ -54,14 +54,14 @@ public class MeetRepository implements IMeetRepository {
 	}
 
 	@Override
-	public CompletableFuture<Meet> create(BareJID key) {
+	public CompletableFuture<Meet> create(BareJID key, int maxNoOfPublishers) {
 		CompletableFuture<Meet> future = new CompletableFuture<>();
 		if (meets.putIfAbsent(key, future) != null) {
 			future.completeExceptionally(new ComponentException(Authorization.CONFLICT));
 			return future;
 		}
 
-		createMeet(key).whenComplete((meet,ex) -> {
+		createMeet(key, maxNoOfPublishers).whenComplete((meet,ex) -> {
 			if (ex != null) {
 				meets.remove(key, future);
 				future.completeExceptionally(ex);
@@ -122,11 +122,11 @@ public class MeetRepository implements IMeetRepository {
 		meetsCounter.getStatistics(component.getName() + "/" + getName(), statisticsList);
 	}
 
-	private CompletableFuture<Meet> createMeet(BareJID meetJid) {
+	private CompletableFuture<Meet> createMeet(BareJID meetJid, int maxNoOfPublishers) {
 		return janusService.newConnection()
 				.thenCompose(connection -> connection.createSession()
 						.thenCompose(session -> session.attachPlugin(JanusVideoRoomPlugin.class)
-								.thenCompose(videoRoomPlugin -> videoRoomPlugin.createRoom(null))
+								.thenCompose(videoRoomPlugin -> videoRoomPlugin.createRoom(null, maxNoOfPublishers))
 								.exceptionallyCompose(
 										ex -> session.destroy().handle((x, ex1) -> CompletableFuture.failedFuture(ex))))
 						// we should close this session even it is not connected? or maybe we should store it?

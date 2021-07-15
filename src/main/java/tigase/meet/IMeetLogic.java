@@ -14,6 +14,8 @@ import java.util.concurrent.CompletableFuture;
 
 public interface IMeetLogic {
 
+	int getDefMaxNoOfPublishers();
+
 	void checkCreatePermission(BareJID meetJid, JID senderJID) throws ComponentException;
 
 	void checkPermission(Meet meet, JID senderJID, Action action) throws ComponentException;

@@ -83,7 +83,7 @@ public class CreateMeetModule extends AbstractModule {
 				() -> "user " + packet.getStanzaFrom() + " initiated meet creation with jid " + meetJid + ", media: " +
 						mediaTypes + ", and allowed: " + allowed);
 
-		return meetRepository.create(meetJid).thenApply(meet -> {
+		return meetRepository.create(meetJid, logic.getDefMaxNoOfPublishers()).thenApply(meet -> {
 			meet.allow(packet.getStanzaFrom().getBareJID());
 			for (BareJID jid : allowed) {
 				meet.allow(jid);

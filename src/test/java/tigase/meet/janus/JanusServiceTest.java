@@ -97,7 +97,7 @@ public class JanusServiceTest extends AbstractKernelTestCase {
 
 		Object roomId = 1234l;
 		try {
-			roomId = plugin1.createRoom(1234l).get();
+			roomId = plugin1.createRoom(1234l, 3).get();
 		} catch (ExecutionException ex) {
 			//room = new JanusVideoRoom(plugin, 1234l);
 		}

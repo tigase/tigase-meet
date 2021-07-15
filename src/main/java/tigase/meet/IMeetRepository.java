@@ -14,7 +14,7 @@ import java.util.concurrent.CompletableFuture;
 
 public interface IMeetRepository extends ComponentStatisticsProvider {
 
-	CompletableFuture<Meet> create(BareJID jid);
+	CompletableFuture<Meet> create(BareJID jid, int maxNoOfPublishers);
 
 	Meet getMeet(BareJID jid) throws ComponentException;
 

@@ -13,6 +13,7 @@ import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Initializable;
 import tigase.kernel.beans.Inject;
 import tigase.kernel.beans.UnregisterAware;
+import tigase.kernel.beans.config.ConfigField;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.BareJID;
 import tigase.xmpp.jid.JID;
@@ -26,6 +27,9 @@ public class DefaultMeetLogic implements IMeetLogic, Initializable, UnregisterAw
 	private EventBus eventBus;
 	@Inject
 	private IMeetRepository meetRepository;
+
+	@ConfigField(desc = "Maximal no. of publishers for each meeting")
+	private Integer maxNoOfPublishers = 6;
 
 	@Override
 	public void checkCreatePermission(BareJID meetJid, JID senderJID) throws ComponentException {
@@ -43,6 +47,11 @@ public class DefaultMeetLogic implements IMeetLogic, Initializable, UnregisterAw
 				throw new ComponentException(Authorization.FORBIDDEN, "You are not authorized to " + action + " this meeting.");
 			}
 		}
+	}
+
+	@Override
+	public int getDefMaxNoOfPublishers() {
+		return maxNoOfPublishers;
 	}
 
 	@Override
