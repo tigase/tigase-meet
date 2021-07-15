@@ -162,9 +162,7 @@ public class MeetRepository implements IMeetRepository {
 		private long last_hour_counter = 0L;
 		private long last_minute_counter = 0L;
 		private long last_second_counter = 0L;
-		private long per_hour = 0L;
-		private long per_minute = 0L;
-		private long per_second = 0L;
+		private long maximum = 0l;
 
 		public CounterWithSupplier(String name, Level level, Supplier<Long> valueSupplier) {
 			this.name = name;
@@ -174,28 +172,27 @@ public class MeetRepository implements IMeetRepository {
 
 		public synchronized void everyHour() {
 			long counter = this.valueSupplier.get();
-			this.per_hour = counter - this.last_hour_counter;
 			this.last_hour_counter = counter;
 		}
 
 		public synchronized void everyMinute() {
 			long counter = this.valueSupplier.get();
-			this.per_minute = counter - this.last_minute_counter;
 			this.last_minute_counter = counter;
 		}
 
 		public synchronized void everySecond() {
 			long counter = this.valueSupplier.get();
-			this.per_second = counter - this.last_second_counter;
 			this.last_second_counter = counter;
+			this.maximum = Math.max(counter, this.maximum);
 		}
 
 		public void getStatistics(String compName, StatisticsList list) {
 			if (list.checkLevel(this.level)) {
 				list.add(compName, this.name + " total", this.valueSupplier.get(), this.level);
-				list.add(compName, this.name + " last hour", this.per_hour, this.level);
-				list.add(compName, this.name + " last minute", this.per_minute, this.level);
-				list.add(compName, this.name + " last second", this.per_second, this.level);
+				list.add(compName, this.name + " last hour", this.last_hour_counter, this.level);
+				list.add(compName, this.name + " last minute", this.last_minute_counter, this.level);
+				list.add(compName, this.name + " last second", this.last_second_counter, this.level);
+				list.add(compName, this.name + " maximum", this.maximum, this.level);
 			}
 		}
 	}
