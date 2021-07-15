@@ -24,6 +24,7 @@ import tigase.xmpp.jid.BareJID;
 import tigase.xmpp.jid.JID;
 
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 
 @Bean(name = "destroyMeetModule", parent = MeetComponent.class, active = true)
 public class DestroyMeetModule extends AbstractModule {
@@ -62,6 +63,15 @@ public class DestroyMeetModule extends AbstractModule {
 
 		logic.checkPermission(meet, from, IMeetLogic.Action.destroy);
 
-		return meet.destroy().thenApply(x -> packet.okResult((Element) null, 0));
+		log.log(Level.FINEST, () -> "user " + packet.getStanzaFrom() + " initiated meet " + meetJid + " destruction");
+		return meet.destroy().thenApply(x -> packet.okResult((Element) null, 0)).whenComplete((x, ex) -> {
+			if (ex != null) {
+				log.log(Level.FINEST, ex,
+						() -> "meet " + meetJid + " destruction by " + packet.getStanzaFrom() + " failed");
+			} else {
+				log.log(Level.FINEST,
+						() -> "meet " + meetJid + " destruction by " + packet.getStanzaFrom() + " succeeded");
+			}
+		});
 	}
 }

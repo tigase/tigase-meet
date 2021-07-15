@@ -14,9 +14,13 @@ import tigase.xmpp.jid.JID;
 
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Bean(name = "presenceCollectorRepository", parent = MeetComponent.class, active = true)
 public class PresenceCollectorRepository implements IPresenceRepository {
+
+	private static final Logger log = Logger.getLogger(PresenceCollectorRepository.class.getCanonicalName());
 
 	private ConcurrentHashMap<BareJID,MeetPresences> meetParticipantPresences = new ConcurrentHashMap<>();
 
@@ -26,6 +30,7 @@ public class PresenceCollectorRepository implements IPresenceRepository {
 	public void addJid(BareJID meetJid, JID jid) {
 		MeetPresences meetPresences = meetParticipantPresences.get(meetJid);
 		if (meetPresences == null) {
+			log.log(Level.FINEST, () -> "not marking " + jid + " as available for " + meetJid + " - meet doesn't exist!");
 			return;
 		}
 
@@ -35,6 +40,7 @@ public class PresenceCollectorRepository implements IPresenceRepository {
 	public void removeJid(BareJID meetJid, JID jid) {
 		MeetPresences meetPresences = meetParticipantPresences.get(meetJid);
 		if (meetPresences == null) {
+			log.log(Level.FINEST, () ->"not marking " + jid + " as unavailable for " + meetJid + " - meet doesn't exist!");
 			return;
 		}
 
@@ -53,10 +59,12 @@ public class PresenceCollectorRepository implements IPresenceRepository {
 	}
 
 	public void meetCreated(BareJID meetJid) {
+		log.log(Level.FINEST, () -> "creating presence store for " + meetJid);
 		meetParticipantPresences.put(meetJid, new MeetPresences());
 	}
 
 	public void meetDestroyed(BareJID meetJid) {
+		log.log(Level.FINEST, () -> "destroying presence store for " + meetJid);
 		meetParticipantPresences.remove(meetJid);
 	}
 

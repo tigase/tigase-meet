@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.logging.Level;
 
 @Bean(name = "createMeetModule", parent = MeetComponent.class, active = true)
 public class CreateMeetModule extends AbstractModule {
@@ -77,7 +78,12 @@ public class CreateMeetModule extends AbstractModule {
 																				   el.getCData())))
 				.orElse(Collections.emptyList());
 
-		return meetRepository.create(BareJID.bareJIDInstance(UUID.randomUUID().toString(), packet.getStanzaTo().getDomain())).thenApply(meet -> {
+		BareJID meetJid = BareJID.bareJIDInstance(UUID.randomUUID().toString(), packet.getStanzaTo().getDomain());
+		log.log(Level.FINEST,
+				() -> "user " + packet.getStanzaFrom() + " initiated meet creation with jid " + meetJid + ", media: " +
+						mediaTypes + ", and allowed: " + allowed);
+
+		return meetRepository.create(meetJid).thenApply(meet -> {
 			meet.allow(packet.getStanzaFrom().getBareJID());
 			for (BareJID jid : allowed) {
 				meet.allow(jid);
@@ -86,6 +92,14 @@ public class CreateMeetModule extends AbstractModule {
 			resultCreateElem.setXMLNS("tigase:meet:0");
 			resultCreateElem.setAttribute("id", meet.getJid().getLocalpart());
 			return packet.okResult(resultCreateElem, 0);
+		}).whenComplete((x, ex) -> {
+			if (ex != null) {
+				log.log(Level.FINEST, ex,
+						() -> "meet " + meetJid + " creation by " + packet.getStanzaFrom() + " failed");
+			} else {
+				log.log(Level.FINEST,
+						() -> "meet " + meetJid + " creation by " + packet.getStanzaFrom() + " succeeded");
+			}
 		});
 	}
 }

@@ -131,7 +131,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 			if (content != null) {
 				listener.receivedPublisherCandidate(sessionId, content);
 			} else {
-				log.log(Level.WARNING, "ERROR: it was not possible to convert publisher JanusPlugin.Candidate to Candidate, " + candidate);
+				log.log(Level.WARNING, () ->"ERROR: it was not possible to convert publisher JanusPlugin.Candidate to Candidate, " + candidate);
 			}
 		});
 	}
@@ -231,6 +231,9 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 
 		int idx = contents.indexOf("a=mid:" + contentName);
 		if (idx == -1) {
+			log.log(Level.WARNING,
+					"content '" + contentName + "' was not found in " + this.getMeet().getJid() + " SDP sent to " +
+							getJid());
 			idx = 0;
 		}
 

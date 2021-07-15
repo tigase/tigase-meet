@@ -83,9 +83,9 @@ public class JingleMeetModule extends AbstractModule {
 				if (!presenceRepository.isAvailable(meetJid, from)) {
 					throw new ComponentException(Authorization.NOT_ALLOWED, "Meet is not aware of your presence!");
 				}
+				log.log(Level.FINEST, () -> "meet " + meetJid + " from " + from + " received " + action + ": " + jingleEl.toString());
 				switch (action) {
 					case sessionInitiate: {
-						log.log(Level.FINEST, () -> "received session-initiate: " + jingleEl.toString());
 						SDP sdp = SDP.from(jingleEl);
 						return withMeet(meetJid).thenCompose(meet -> logic.checkPermissionFuture(meet, from, IMeetLogic.Action.join)).thenCompose(meet -> meet.join(from)).thenCompose(participation -> {
 							participation.setListener(new ParticipationListener(meetJid, participation));
@@ -166,6 +166,7 @@ public class JingleMeetModule extends AbstractModule {
 		return withMeet(meetJid).thenCompose(meet -> {
 			Participation participation = meet.getParticipation(sender);
 			if (participation == null)  {
+				log.log(Level.FINEST, () -> "user " + sender + " requested participation in " + meetJid + " but there is none");
 				return CompletableFuture.failedFuture(new ComponentException(Authorization.ITEM_NOT_FOUND));
 			} else {
 				return CompletableFuture.completedFuture(participation);
@@ -176,6 +177,7 @@ public class JingleMeetModule extends AbstractModule {
 	private CompletableFuture<Void> sendJingle(BareJID from, JID to, Action action, String sessionId, SDP sdp, Participation participation) {
 		return sendJingle(from, to, action,sessionId, sdp).whenComplete((x, ex) -> {
 			if (ex != null) {
+				log.log(Level.FINEST, ex, () -> "meet " + from + " received from " + to + " an error response on " + action);
 				participation.leave(ex);
 			} else {
 				// everything went well, nothing to do..
@@ -256,7 +258,6 @@ public class JingleMeetModule extends AbstractModule {
 		@Override
 		public void receivedPublisherSDP(String sessionId, ContentAction contentAction,
 										 SDP sdp) {
-			log.log(Level.FINEST, "received publisher SDP in listener");
 			sendJingle(meetJid, participation.getJid(), contentAction.toJingleAction(Action.sessionAccept), sessionId, sdp, participation);
 		}
 

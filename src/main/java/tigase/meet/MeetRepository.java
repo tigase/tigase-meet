@@ -9,20 +9,31 @@ package tigase.meet;
 import tigase.component.exceptions.ComponentException;
 import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Inject;
+import tigase.kernel.beans.config.ConfigField;
 import tigase.meet.janus.JanusService;
 import tigase.meet.janus.videoroom.JanusVideoRoomPlugin;
 import tigase.server.AbstractMessageReceiver;
+import tigase.stats.StatisticsList;
 import tigase.util.common.TimerTask;
 import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.BareJID;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Bean(name = "meetRepository", parent = MeetComponent.class, active = true)
 public class MeetRepository implements IMeetRepository {
 
+	private static final Logger log = Logger.getLogger(MeetRepository.class.getCanonicalName());
 	private final ConcurrentHashMap<BareJID, CompletableFuture<Meet>> meets = new ConcurrentHashMap<>();
+
+	@ConfigField(
+			desc = "Bean name"
+	)
+	private String name;
 
 	@Inject(bean = "service")
 	private AbstractMessageReceiver component;
@@ -30,6 +41,17 @@ public class MeetRepository implements IMeetRepository {
 	private JanusService janusService;
 	@Inject(nullAllowed = true)
 	private PresenceCollectorRepository presenceCollectorRepository;
+
+	private final CounterWithSupplier meetsCounter = new CounterWithSupplier("active meetings", Level.FINEST,
+																			 () -> (long) this.size());
+
+	public String getName() {
+		return name;
+	}
+
+	public void setName(String name) {
+		this.name = name;
+	}
 
 	@Override
 	public CompletableFuture<Meet> create(BareJID key) {
@@ -73,6 +95,31 @@ public class MeetRepository implements IMeetRepository {
 		if (presenceCollectorRepository != null) {
 			presenceCollectorRepository.meetDestroyed(jid);
 		}
+		log.log(Level.FINEST, () -> "meet " + jid  + " was destroyed");
+	}
+
+	public int size() {
+		return meets.size();
+	}
+	
+	@Override
+	public void everyHour() {
+		meetsCounter.everyHour();
+	}
+
+	@Override
+	public void everyMinute() {
+		meetsCounter.everyMinute();
+	}
+
+	@Override
+	public void everySecond() {
+		meetsCounter.everySecond();
+	}
+
+	@Override
+	public void getStatistics(String s, StatisticsList statisticsList) {
+		meetsCounter.getStatistics(component.getName() + "/" + getName(), statisticsList);
 	}
 
 	private CompletableFuture<Meet> createMeet(BareJID meetJid) {
@@ -83,7 +130,10 @@ public class MeetRepository implements IMeetRepository {
 								.exceptionallyCompose(
 										ex -> session.destroy().handle((x, ex1) -> CompletableFuture.failedFuture(ex))))
 						// we should close this session even it is not connected? or maybe we should store it?
-						.thenApply(roomId -> new Meet(this, connection, roomId, meetJid))
+						.thenApply(roomId -> {
+							log.log(Level.FINEST, () -> "meet " + meetJid  + " was created");
+							return new Meet(this, connection, roomId, meetJid);
+						})
 						.exceptionallyCompose(ex -> {
 							connection.close();
 							return CompletableFuture.failedFuture(ex);
@@ -101,5 +151,52 @@ public class MeetRepository implements IMeetRepository {
 		};
 		component.addTimerTask(timerTask, 5 * 60 * 1000);
 		return timerTask;
+	}
+
+	private class CounterWithSupplier {
+		private final Supplier<Long> valueSupplier;
+
+		protected final Level level;
+		protected String name;
+
+		private long last_hour_counter = 0L;
+		private long last_minute_counter = 0L;
+		private long last_second_counter = 0L;
+		private long per_hour = 0L;
+		private long per_minute = 0L;
+		private long per_second = 0L;
+
+		public CounterWithSupplier(String name, Level level, Supplier<Long> valueSupplier) {
+			this.name = name;
+			this.level = level;
+			this.valueSupplier = valueSupplier;
+		}
+
+		public synchronized void everyHour() {
+			long counter = this.valueSupplier.get();
+			this.per_hour = counter - this.last_hour_counter;
+			this.last_hour_counter = counter;
+		}
+
+		public synchronized void everyMinute() {
+			long counter = this.valueSupplier.get();
+			this.per_minute = counter - this.last_minute_counter;
+			this.last_minute_counter = counter;
+		}
+
+		public synchronized void everySecond() {
+			long counter = this.valueSupplier.get();
+			this.per_second = counter - this.last_second_counter;
+			this.last_second_counter = counter;
+		}
+
+		public void getStatistics(String compName, StatisticsList list) {
+			if (list.checkLevel(this.level)) {
+				list.add(compName, this.name + " total", this.valueSupplier.get(), this.level);
+				list.add(compName, this.name + " last hour", this.per_hour, this.level);
+				list.add(compName, this.name + " last minute", this.per_minute, this.level);
+				list.add(compName, this.name + " last second", this.per_second, this.level);
+			}
+		}
 	}
 }

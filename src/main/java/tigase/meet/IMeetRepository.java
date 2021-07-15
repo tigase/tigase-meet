@@ -7,15 +7,17 @@
 package tigase.meet;
 
 import tigase.component.exceptions.ComponentException;
+import tigase.stats.ComponentStatisticsProvider;
 import tigase.xmpp.jid.BareJID;
 
 import java.util.concurrent.CompletableFuture;
 
-public interface IMeetRepository {
+public interface IMeetRepository extends ComponentStatisticsProvider {
 
 	CompletableFuture<Meet> create(BareJID jid);
 
 	Meet getMeet(BareJID jid) throws ComponentException;
 
 	void destroyed(BareJID jid);
+	
 }
