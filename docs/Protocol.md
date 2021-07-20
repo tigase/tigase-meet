@@ -67,6 +67,46 @@ Component will respond with `<iq/>` of type `result` and `<create/>` element qua
 	<create id='23423' xmlns='tigase:meet:0'/>
 </iq>
 ````
+             
+#### 3.1.2. Allowing user access to the call
+To allow new user access to the call, meet owner's client sends `<iq/>` stanza of type `set` to the bare JID of the group call with a `<allow/>` element qualified by the `tigase:meet:0` namespace.
+`allow` element must contain one `<participant/>` element for each participant which should be added to JIDs allowed to join the group call.
+
+````xml
+<iq type='set' id='create-1' to='meet.example.com'>
+	<allow xmlns='tigase:meet:0'>
+		<participant>user2@example.com</participant>
+		<participant>user3@example.com</participant>
+  </allow>
+</iq>
+````
+
+Component will respond with `<iq/>` of type `result`.
+
+````xml
+<iq type='result' id='create-1' from='meet.example.com' />
+````
+
+#### 3.1.2. Deny user access to the call
+To deny new user access to the call, meet owner's client sends `<iq/>` stanza of type `set` to the bare JID of the group call with a `<deny/>` element qualified by the `tigase:meet:0` namespace.
+`deny` element must contain one `<participant/>` element for each participant which should be removed from JIDs allowed to join the group call.
+
+````xml
+<iq type='set' id='create-1' to='meet.example.com'>
+	<deny xmlns='tigase:meet:0'>
+		<participant>user2@example.com</participant>
+		<participant>user3@example.com</participant>
+  </deny>
+</iq>
+````
+
+Component will respond with `<iq/>` of type `result`.
+
+````xml
+<iq type='result' id='create-1' from='meet.example.com' />
+````
+
+**Note:** If denied users would be in the call, he will be kicked out.
 
 ### 3.2. Establishing call
 

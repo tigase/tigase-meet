@@ -49,6 +49,11 @@ public class Meet extends AbstractMeet<Participation> {
 
 	public void deny(BareJID jid) {
 		allowed.remove(jid);
+		participationByJid.entrySet()
+				.stream()
+				.filter(e -> jid.equals(e.getKey().getBareJID()))
+				.map(e -> e.getValue())
+				.forEach(participation -> participation.leave(null));
 	}
 
 	public boolean isPublic() {
