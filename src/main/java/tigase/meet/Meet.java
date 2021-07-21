@@ -98,6 +98,10 @@ public class Meet extends AbstractMeet<Participation> {
 		return !this.participationByJid.isEmpty();
 	}
 
+	public int getParticipantsCount() {
+		return participationByJid.size();
+	}
+
 	private synchronized void cancelTimeoutTask() {
 		TimerTask timerTask = this.timeoutTask;
 		this.timeoutTask = null;

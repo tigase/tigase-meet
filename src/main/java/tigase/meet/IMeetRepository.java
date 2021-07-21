@@ -19,5 +19,9 @@ public interface IMeetRepository extends ComponentStatisticsProvider {
 	Meet getMeet(BareJID jid) throws ComponentException;
 
 	void destroyed(BareJID jid);
-	
+
+	int size();
+
+	int getMaxParticipantsInMeeting();
+
 }

@@ -118,10 +118,27 @@ public class MeetRepository implements IMeetRepository {
 	}
 
 	@Override
+	public int getMaxParticipantsInMeeting() {
+		return meets.values()
+				.stream()
+				.filter(future -> future.isDone() && !(future.isCancelled() || future.isCompletedExceptionally()))
+				.mapToInt(future -> {
+					try {
+						return future.get().getParticipantsCount();
+					} catch (Throwable ex) {
+						// we ignore exceptions as we filtered out not finished, cancelled or exceptionally completed futures
+						return 0;
+					}
+				})
+				.max()
+				.orElse(0);
+	}
+
+	@Override
 	public void getStatistics(String s, StatisticsList statisticsList) {
 		meetsCounter.getStatistics(component.getName() + "/" + getName(), statisticsList);
 	}
-
+	
 	private CompletableFuture<Meet> createMeet(BareJID meetJid, int maxNoOfPublishers) {
 		return janusService.newConnection()
 				.thenCompose(connection -> connection.createSession()

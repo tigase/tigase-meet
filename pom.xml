@@ -139,7 +139,7 @@
         <dependency>
             <groupId>tigase</groupId>
             <artifactId>licence-lib</artifactId>
-            <version>1.4.0</version>
+            <version>1.5.0-SNAPSHOT</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
