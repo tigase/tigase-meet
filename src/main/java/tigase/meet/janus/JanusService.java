@@ -57,6 +57,11 @@ public class JanusService implements Initializable, UnregisterAware {
 		licenceChecker = LicenceChecker.getLicenceChecker("acs", new LicenceCheckerUpdateCallbackImpl("acs") {
 
 			@Override
+			public String getID() {
+				return "meet";
+			}
+
+			@Override
 			public Element getComponentAdditionalData() {
 				Element element = super.getComponentAdditionalData();
 				element.addChild(new Element("meets-count", String.valueOf(meetRepository.size())));
