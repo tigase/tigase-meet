@@ -47,6 +47,7 @@ public class ParticipationWithListener extends AbstractParticipation<Participati
 	
 	public void setListener(Listener listener) {
 		this.listener = listener;
+		super.setListeners();
 	}
 
 	@Override

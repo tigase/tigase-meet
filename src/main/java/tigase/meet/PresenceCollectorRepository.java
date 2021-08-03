@@ -6,9 +6,11 @@
  */
 package tigase.meet;
 
+import tigase.component.exceptions.ComponentException;
 import tigase.eventbus.EventBus;
 import tigase.kernel.beans.Bean;
 import tigase.kernel.beans.Inject;
+import tigase.xmpp.Authorization;
 import tigase.xmpp.jid.BareJID;
 import tigase.xmpp.jid.JID;
 
@@ -27,21 +29,21 @@ public class PresenceCollectorRepository implements IPresenceRepository {
 	@Inject
 	private EventBus eventBus;
 
-	public void addJid(BareJID meetJid, JID jid) {
+	public void addJid(BareJID meetJid, JID jid) throws ComponentException {
 		MeetPresences meetPresences = meetParticipantPresences.get(meetJid);
 		if (meetPresences == null) {
 			log.log(Level.FINEST, () -> "not marking " + jid + " as available for " + meetJid + " - meet doesn't exist!");
-			return;
+			throw new ComponentException(Authorization.ITEM_NOT_FOUND, "There is no meeting for this JID");
 		}
 
 		meetPresences.addJid(jid);
 	}
 
-	public void removeJid(BareJID meetJid, JID jid) {
+	public void removeJid(BareJID meetJid, JID jid) throws ComponentException {
 		MeetPresences meetPresences = meetParticipantPresences.get(meetJid);
 		if (meetPresences == null) {
 			log.log(Level.FINEST, () ->"not marking " + jid + " as unavailable for " + meetJid + " - meet doesn't exist!");
-			return;
+			throw new ComponentException(Authorization.ITEM_NOT_FOUND, "There is no meeting for this JID");
 		}
 
 		meetPresences.removeJid(jid);

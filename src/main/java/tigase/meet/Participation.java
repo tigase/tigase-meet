@@ -38,10 +38,12 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	private final DelayedRunQueue cachedLocalPublisherCandidatesQueue = new DelayedRunQueue();
 	private final DelayedRunQueue cachedLocalSubscriberCandidatesQueue = new DelayedRunQueue();
 
-	private CopyOnWriteArrayList<Publisher> publishers = new CopyOnWriteArrayList<>();
+	private final CopyOnWriteArrayList<Publisher> publishers;
 
 	public Participation(Meet meet, JID jid, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		super(meet, jid, localPublisher, localSubscriber);
+		publishers = new CopyOnWriteArrayList<>();
+		super.setListeners();
 	}
 
 	@Override

@@ -27,16 +27,27 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 	protected final LocalPublisher publisher;
 	protected final LocalSubscriber subscriber;
 
+	/**
+	 * Constructor of the class which stores publisher and subscriber.
+	 *
+	 * Remember to call `setListeners()` method to initialize listeners.
+	 * @param meet
+	 * @param localPublisher
+	 * @param localSubscriber
+	 */
 	public AbstractParticipation(M meet, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		this.meet = meet;
 		this.publisher = localPublisher;
 		this.subscriber = localSubscriber;
-		this.subscriber.setListener(this);
-		this.publisher.setListener(this);
 	}
 
 	public M getMeet() {
 		return meet;
+	}
+
+	public void setListeners() {
+		this.subscriber.setListener(this);
+		this.publisher.setListener(this);
 	}
 
 	@Override
