@@ -43,7 +43,6 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	public Participation(Meet meet, JID jid, LocalPublisher localPublisher, LocalSubscriber localSubscriber) {
 		super(meet, jid, localPublisher, localSubscriber);
 		publishers = new CopyOnWriteArrayList<>();
-		super.setListeners();
 	}
 
 	@Override
@@ -244,6 +243,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 
 	public void setListener(Listener listener) {
 		this.listener = listener;
+		setListeners();
 	}
 
 	protected Content convertCandidateToContent(Content.Creator role, SDP sdp, JanusPlugin.Candidate janusCandidate) {
