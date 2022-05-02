@@ -19,6 +19,7 @@ import tigase.xmpp.jid.JID;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -28,10 +29,16 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 
 	private static final Logger log = Logger.getLogger(Participation.class.getCanonicalName());
 
-	private SDP localPublisherSDP;
-	private SDP localSubscriberSDP;
-	private JSEP remotePublisherSDP;
-	private JSEP remoteSubscriberSDP;
+	private final Content.Creator localPublisherRole = Content.Creator.responder;
+	private final Content.Creator localSubscriberRole = Content.Creator.initiator;
+
+	private SDPHolder localPublisherSDP;
+	private SDPHolder localSubscriberSDP;
+	private SDPHolder remotePublisherSDP;
+	private SDPHolder remoteSubscriberSDP;
+
+	private Map<String,Content.Creator> publisherContentCreators = new ConcurrentHashMap<>();
+	private Map<String,Content.Creator> subscriberContentCreators = new ConcurrentHashMap<>();
 
 	private Listener listener;
 
@@ -76,40 +83,43 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 			return CompletableFuture.failedFuture(new ComponentException(Authorization.CONFLICT));
 		}
 
-		SDP prevSDP = this.remotePublisherSDP == null
-					  ? null
-					  : SDP.from(this.remotePublisherSDP.getSdp(), Content.Creator.initiator);
+		updatePublisherContentCreators(sdpOffer);
+
+		SDP prevSDP = this.remotePublisherSDP == null ? null : remotePublisherSDP.sdp();
 		
 		if (prevSDP == null) {
-			JSEP jsepOffer = new JSEP(JSEP.Type.offer, sdpOffer.toString("0"));
-			this.remotePublisherSDP = jsepOffer;
+			JSEP jsepOffer = new JSEP(JSEP.Type.offer, sdpOffer.toString("0", Content.Creator.responder, SDP.Direction.incoming));
+			this.remotePublisherSDP = new SDPHolder(sdpOffer, jsepOffer);
 			return this.sendPublisherSDP(jsepOffer)
-					.thenApply(jsepAnswer -> SDP.from(jsepAnswer.getSdp(), Content.Creator.responder))
-					.whenComplete((answerSDP, ex) -> {
+					.thenApply(jsepAnswer -> new SDPHolder(SDP.from(jsepAnswer.getSdp(), this::getPublisherContentCreatorFor, Content.Creator.responder), jsepAnswer))
+					.whenComplete((sdpHolder, ex) -> {
 						synchronized (this) {
-							this.localPublisherSDP = answerSDP;
+							updatePublisherContentCreators(sdpHolder.sdp());
+							this.localPublisherSDP = sdpHolder;
 							cachedLocalPublisherCandidatesQueue.delayFinished();
 						}
-					});
+					}).thenApply(SDPHolder::sdp);
 		} else {
-			JSEP jsepOffer = new JSEP(JSEP.Type.offer, prevSDP.applyDiff(action, sdpOffer).toString("0"));
-			this.remotePublisherSDP = jsepOffer;
+			JSEP jsepOffer = new JSEP(JSEP.Type.offer, prevSDP.applyDiff(action, sdpOffer).toString("0", Content.Creator.responder, SDP.Direction.incoming));
+			this.remotePublisherSDP = new SDPHolder(sdpOffer, jsepOffer);
 			return this.sendPublisherSDP(jsepOffer)
-					.thenApply(jsepAnswer -> SDP.from(jsepAnswer.getSdp(), Content.Creator.responder))
-					.whenComplete((answerSDP, ex) -> {
+					.thenApply(jsepAnswer -> new SDPHolder(SDP.from(jsepAnswer.getSdp(), this::getPublisherContentCreatorFor, Content.Creator.responder), jsepAnswer))
+					.whenComplete((sdpHolder, ex) -> {
 						synchronized (this) {
-							this.localPublisherSDP = answerSDP;
+							updatePublisherContentCreators(sdpHolder.sdp());
+							this.localPublisherSDP = sdpHolder;
 							cachedLocalPublisherCandidatesQueue.delayFinished();
 						}
-					});
+					}).thenApply(SDPHolder::sdp);
 		}
 	}
 
 	@Override
 	protected synchronized void receivedPublisherSDP(String sessionId, JSEP jsep) {
-		SDP prevSDP = this.localPublisherSDP;
-		SDP currentSDP = SDP.from(jsep.getSdp(), Content.Creator.responder);
-		this.localPublisherSDP = currentSDP;
+		SDP prevSDP = this.localPublisherSDP == null ? null : this.localPublisherSDP.sdp();
+		SDP currentSDP = SDP.from(jsep.getSdp(), this::getPublisherContentCreatorFor, Content.Creator.responder);
+		updatePublisherContentCreators(currentSDP);
+		this.localPublisherSDP = new SDPHolder(currentSDP, jsep);
 		if (prevSDP == null) {
 			listener.receivedPublisherSDP(sessionId, ContentAction.init, currentSDP);
 			cachedLocalPublisherCandidatesQueue.delayFinished();
@@ -128,7 +138,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	@Override
 	protected synchronized void receivedPublisherCandidate(String sessionId, JanusPlugin.Candidate candidate) {
 		cachedLocalPublisherCandidatesQueue.offer(() -> {
-			Content content = convertCandidateToContent(Content.Creator.initiator, localPublisherSDP, candidate);
+			Content content = convertCandidateToContent(Content.Creator.initiator, localPublisherSDP.sdp(), candidate);
 			if (content != null) {
 				listener.receivedPublisherCandidate(sessionId, content);
 			} else {
@@ -142,26 +152,27 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 			return CompletableFuture.failedFuture(new ComponentException(Authorization.CONFLICT));
 		}
 
-		SDP prevSDP = this.remoteSubscriberSDP == null
-					  ? null
-					  : SDP.from(this.remoteSubscriberSDP.getSdp(), Content.Creator.initiator);
+		updateSubscriberContentCreators(sdpAnswer);
+
+		SDP prevSDP = this.remoteSubscriberSDP == null ? null : this.remoteSubscriberSDP.sdp();
 
 		if (prevSDP == null) {
-			JSEP jsepOffer = new JSEP(JSEP.Type.answer, sdpAnswer.toString("0"));
-			this.remoteSubscriberSDP = jsepOffer;
+			JSEP jsepOffer = new JSEP(JSEP.Type.answer, sdpAnswer.toString("0", Content.Creator.initiator, SDP.Direction.incoming));
+			this.remoteSubscriberSDP = new SDPHolder(sdpAnswer, jsepOffer);
 			return this.sendSubscriberSDP(jsepOffer);
 		} else {
-			JSEP jsepOffer = new JSEP(JSEP.Type.answer, prevSDP.applyDiff(action, sdpAnswer).toString("0"));
-			this.remoteSubscriberSDP = jsepOffer;
+			JSEP jsepOffer = new JSEP(JSEP.Type.answer, prevSDP.applyDiff(action, sdpAnswer).toString("0", Content.Creator.initiator, SDP.Direction.incoming));
+			this.remoteSubscriberSDP = new SDPHolder(sdpAnswer, jsepOffer);
 			return this.sendSubscriberSDP(jsepOffer);
 		}
 	}
 
 	@Override
 	protected void receivedSubscriberSDP(String sessionId, JSEP jsep) {
-		SDP prevSDP = this.localSubscriberSDP;
-		SDP currentSDP = SDP.from(jsep.getSdp(), Content.Creator.initiator);
-		this.localSubscriberSDP = currentSDP;
+		SDP prevSDP = this.localSubscriberSDP == null ? null : this.localSubscriberSDP.sdp();
+		SDP currentSDP = SDP.from(jsep.getSdp(), this::getSubscriberContentCreatorFor, Content.Creator.initiator);
+		updateSubscriberContentCreators(currentSDP);
+		this.localSubscriberSDP = new SDPHolder(currentSDP, jsep);
 		if (prevSDP == null) {
 			listener.receivedSubscriberSDP(sessionId, ContentAction.init, currentSDP);
 			cachedLocalSubscriberCandidatesQueue.delayFinished();
@@ -173,7 +184,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 				if (sdp != null) {
 					listener.receivedSubscriberSDP(sessionId, action, sdp);
 					if (action == ContentAction.modify)  {
-						sendSubscriberSDP(remoteSubscriberSDP);
+						sendSubscriberSDP(remoteSubscriberSDP.jsep);
 					}
 				}
 			}
@@ -183,7 +194,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 	@Override
 	protected void receivedSubscriberCandidate(String sessionId, JanusPlugin.Candidate candidate) {
 		cachedLocalSubscriberCandidatesQueue.offer(() -> {
-			Content content = convertCandidateToContent(Content.Creator.initiator, localSubscriberSDP, candidate);
+			Content content = convertCandidateToContent(Content.Creator.initiator, localSubscriberSDP.sdp(), candidate);
 			if (content != null) {
 				listener.receivedSubscriberCandidate(sessionId, content);
 			} else {
@@ -205,13 +216,13 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 
 	public void sendPublisherCandidate(String contentName, Candidate candidate) {
 		sendPublisherCandidate(
-				new JanusPlugin.Candidate(contentName, findSdpMLineIndex(remotePublisherSDP, contentName),
+				new JanusPlugin.Candidate(contentName, findSdpMLineIndex(remotePublisherSDP.jsep(), contentName),
 										  candidate.toSDP()));
 	}
 
 	public void sendSubscriberCandidate(String contentName, Candidate candidate) {
 		sendSubscriberCandidate(
-				new JanusPlugin.Candidate(contentName, findSdpMLineIndex(remoteSubscriberSDP, contentName),
+				new JanusPlugin.Candidate(contentName, findSdpMLineIndex(remoteSubscriberSDP.jsep(), contentName),
 										  candidate.toSDP()));
 	}
 
@@ -273,6 +284,28 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 												 List.of(candidate), Optional.empty())));
 	}
 
+	protected Content.Creator getPublisherContentCreatorFor(String name) {
+		// local session is always responder
+		return Optional.ofNullable(publisherContentCreators.get(name)).orElse(Content.Creator.responder);
+	}
+
+	protected void updatePublisherContentCreators(SDP sdp) {
+		for (Content content : sdp.getContents()) {
+			publisherContentCreators.put(content.getName(), content.getCreator());
+		}
+	}
+
+	protected Content.Creator getSubscriberContentCreatorFor(String name) {
+		// local session is always initiator
+		return Optional.ofNullable(subscriberContentCreators.get(name)).orElse(Content.Creator.initiator);
+	}
+
+	protected void updateSubscriberContentCreators(SDP sdp) {
+		for (Content content : sdp.getContents()) {
+			subscriberContentCreators.put(content.getName(), content.getCreator());
+		}
+	}
+
 	public interface Listener {
 
 		void publishersJoined(Collection<Publisher> joined);
@@ -293,4 +326,7 @@ public class Participation extends AbstractParticipationWithSession<Participatio
 		
 	}
 
+	public record SDPHolder(SDP sdp, JSEP jsep) {
+
+	}
 }

@@ -10,10 +10,16 @@ import tigase.xml.Element;
 import tigase.xmpp.jid.JID;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 public class SDP {
+
+	public static enum Direction {
+		incoming,
+		outgoing
+	}
 
 	public static SDP from(Element jingleEl) {
 //		JID initiator = Optional.ofNullable(jingleEl.getAttributeStaticStr("initiator"))
@@ -38,7 +44,7 @@ public class SDP {
 		return new SDP(String.valueOf(new Date().getTime()), contents, bundle);
 	}
 
-	public static SDP from(String sdp, Content.Creator creator) {
+	public static SDP from(String sdp, Function<String,Content.Creator> creatorProvider, Content.Creator localRole) {
 		String[] parts = sdp.substring(0, sdp.length() - 2).split("\r\nm=");
 		List<String> media = Arrays.stream(parts).skip(1).map(it -> "m=" + it).collect(Collectors.toList());
 		String[] sessionLines = parts[0].split("\r\n");
@@ -63,7 +69,7 @@ public class SDP {
 				.orElse(Collections.emptyList());
 
 		List<Content> contents = media.stream()
-				.map(m -> Content.from(m, sessionLines, creator))
+				.map(m -> Content.from(m, sessionLines, creatorProvider, localRole))
 				.filter(Objects::nonNull)
 				.collect(Collectors.toList());
 		return new SDP(id, contents, bundle);
@@ -118,7 +124,7 @@ public class SDP {
 		return jingleEl;
 	}
 
-	public String toString(String sid) {
+	public String toString(String sid, Content.Creator localRole, Direction direction) {
 		List<String> lines = new ArrayList<>();
 		lines.add("v=0");
 		lines.add("o=- " + sid + " " + id + " IN IP4 0.0.0.0");
@@ -129,7 +135,7 @@ public class SDP {
 			lines.add("a=group:BUNDLE " + bundle.stream().collect(Collectors.joining(" ")));
 		}
 
-		contents.stream().map(Content::toSDP).forEach(lines::add);
+		contents.stream().map(c -> c.toSDP(localRole, direction)).forEach(lines::add);
 
 		return lines.stream().collect(Collectors.joining("\r\n")) + "\r\n";
 	}

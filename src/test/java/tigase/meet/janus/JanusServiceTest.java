@@ -33,7 +33,7 @@ import java.util.logging.Logger;
 @Ignore
 public class JanusServiceTest extends AbstractKernelTestCase {
 
-	private static final String TEST_SDP = "v0=0\n" + "o=- 7748854561613975422 2 IN IP4 127.0.0.1\n" + "s=-\n" +
+	private static final String TEST_SDP = "v=0\n" + "o=- 7748854561613975422 2 IN IP4 127.0.0.1\n" + "s=-\n" +
 			"t=0 0\n" + "a=group:BUNDLE m0\n" + "a=msid-semantic: WMS RTCmS\n" +
 			"m=audio 64527 UDP/TLS/RTP/SAVPF 111 103 104 9 102 0 8 106 105 13 110 112 113 126\n" +
 			"c=IN IP4 10.28.28.197\n" + "a=rtcp:9 IN IP4 0.0.0.0\n" +
@@ -75,7 +75,7 @@ public class JanusServiceTest extends AbstractKernelTestCase {
 	@Before
 	public void setupJanus() {
 		configureLogging(Level.FINEST);
-		ConfigBuilder configBuilder = new ConfigBuilder().with(new AbstractBeanConfigurator.BeanDefinition.Builder().name("janus").active(true).with("uri", "wss://127.0.0.1:8989/").build());
+		ConfigBuilder configBuilder = new ConfigBuilder().with(new AbstractBeanConfigurator.BeanDefinition.Builder().name("janus").active(true).with("uri", "ws://127.0.0.1:8188/").build());
 		getKernel().getInstance(DSLBeanConfigurator.class).setProperties(configBuilder.build());
 		janusService = getKernel().getInstance(JanusService.class);
 	}

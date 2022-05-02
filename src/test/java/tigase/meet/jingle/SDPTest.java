@@ -9,6 +9,7 @@ package tigase.meet.jingle;
 import org.junit.Test;
 
 import java.util.UUID;
+import java.util.function.Function;
 
 import static org.junit.Assert.*;
 
@@ -47,17 +48,39 @@ public class SDPTest {
 
 	@Test
 	public void testConversion() {
+		Function<String,Content.Creator> creatorProvider = name -> Content.Creator.initiator;
 		String sid = UUID.randomUUID().toString();
-		SDP sdp1 = SDP.from(SDPTest.TEST_STRING, Content.Creator.initiator);
+		SDP sdp1 = SDP.from(SDPTest.TEST_STRING, creatorProvider, Content.Creator.initiator);
 		assertNotNull(sdp1);
 		assertFalse(sdp1.getBundle().isEmpty());
 		assertFalse(sdp1.getContents().get(1).getDescription().get().getPayloads().get(0).getRtcpFeedback().isEmpty());
-		String sdpStr1 = sdp1.toString(sid);
+		String sdpStr1 = sdp1.toString(sid, Content.Creator.initiator, SDP.Direction.outgoing);
 
-		SDP sdp2 = SDP.from(sdpStr1, Content.Creator.initiator);
+		SDP sdp2 = SDP.from(sdpStr1, creatorProvider, Content.Creator.initiator);
 		assertNotNull(sdp2);
-		String sdpStr2 = sdp2.toString(sid);
+		String sdpStr2 = sdp2.toString(sid, Content.Creator.initiator, SDP.Direction.outgoing);
 		
+		assertEquals(sdp2.getContents(), sdp2.getContents());
+		assertFalse(sdp2.getBundle().isEmpty());
+		assertFalse(sdp2.getContents().get(1).getDescription().get().getPayloads().get(0).getRtcpFeedback().isEmpty());
+
+		assertEquals(sdpStr2, sdpStr1);
+	}
+
+	@Test
+	public void testConversion2() {
+		Function<String,Content.Creator> creatorProvider = name -> Content.Creator.initiator;
+		String sid = UUID.randomUUID().toString();
+		SDP sdp1 = SDP.from(SDPTest.TEST_STRING, creatorProvider, Content.Creator.initiator);
+		assertNotNull(sdp1);
+		assertFalse(sdp1.getBundle().isEmpty());
+		assertFalse(sdp1.getContents().get(1).getDescription().get().getPayloads().get(0).getRtcpFeedback().isEmpty());
+		String sdpStr1 = sdp1.toString(sid, Content.Creator.initiator, SDP.Direction.outgoing);
+
+		SDP sdp2 = SDP.from(sdpStr1, creatorProvider, Content.Creator.initiator);
+		assertNotNull(sdp2);
+		String sdpStr2 = sdp2.toString(sid, Content.Creator.responder, SDP.Direction.incoming);
+
 		assertEquals(sdp2.getContents(), sdp2.getContents());
 		assertFalse(sdp2.getBundle().isEmpty());
 		assertFalse(sdp2.getContents().get(1).getDescription().get().getPayloads().get(0).getRtcpFeedback().isEmpty());

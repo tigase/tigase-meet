@@ -17,6 +17,10 @@ import java.util.stream.Collectors;
 public class Description {
 
 	public static Description from(Element el) {
+		// ignore SRTP by default as it call rejection of session by WebRTC
+		return from(el,true);
+	}
+	public static Description from(Element el, boolean ignoreSRTP) {
 		if ("description".equals(el.getName()) && "urn:xmpp:jingle:apps:rtp:1".equals(el.getXMLNS())) {
 			String media = el.getAttributeStaticStr("media");
 			if (media == null) {
@@ -31,7 +35,7 @@ public class Description {
 			Optional<String> bandwidth = Optional.ofNullable(el.getChild("bandwidth"))
 					.map(it -> it.getAttributeStaticStr("type"));
 			boolean rtcpMux = el.getChild("rtcp-mux") != null;
-			List<Encryption> encryptions = Optional.ofNullable(el.getChild("encryption"))
+			List<Encryption> encryptions = ignoreSRTP ? Collections.emptyList() : Optional.ofNullable(el.getChild("encryption"))
 					.map(it -> it.getChildren())
 					.orElse(Collections.emptyList())
 					.stream()
@@ -126,6 +130,11 @@ public class Description {
 	}      
 
 	public Element toElement() {
+		// ignore SRTP by default as it call rejection of session by WebRTC
+		return toElement(true);
+	}
+
+	public Element toElement(boolean ignoreSRTP) {
 		Element el = new Element("description");
 		el.setXMLNS("urn:xmpp:jingle:apps:rtp:1");
 		el.setAttribute("media", media);
@@ -134,7 +143,7 @@ public class Description {
 		}
 		ssrc.ifPresent(ssrc -> el.setAttribute("ssrc", ssrc));
 		payloads.stream().map(Payload::toElement).forEach(el::addChild);
-		if (!encryptions.isEmpty()) {
+		if ((!ignoreSRTP) && !encryptions.isEmpty()) {
 			Element encryption = new Element("encryption");
 			encryptions.stream().map(Encryption::toElement).forEach(encryption::addChild);
 			el.addChild(encryption);

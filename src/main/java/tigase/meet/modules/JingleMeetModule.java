@@ -91,7 +91,7 @@ public class JingleMeetModule extends AbstractModule {
 							participation.setListener(new ParticipationListener(meetJid, participation));
 
 							participation.startPublisherSession(sessionId);
-							log.log(Level.FINEST, () -> "sending SDP to Janus: " + sdp.toString("0"));
+							log.log(Level.FINEST, () -> "sending SDP to Janus: " + sdp.toString("0", Content.Creator.responder, SDP.Direction.incoming));
 							return participation.sendPublisherSDP(sessionId, ContentAction.init, sdp).thenApply(result -> {
 								log.log(Level.FINEST, "received publisher SDP in completion handler");
 								return packet.okResult((String) null, 0);

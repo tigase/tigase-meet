@@ -40,10 +40,7 @@ import tigase.xmpp.jid.JID;
 
 import java.lang.reflect.Field;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 import java.util.logging.ConsoleHandler;
@@ -74,6 +71,31 @@ public class MeetTest extends AbstractKernelTestCase {
 	private MeetRepository meetRepository;
 	private JingleMeetModule jingleMeetModule;
 
+	private Map<String,Content.Creator> publisherContentCreators = new ConcurrentHashMap<>();
+	private Map<String,Content.Creator> subscriberContentCreators = new ConcurrentHashMap<>();
+
+	protected Content.Creator getPublisherContentCreatorFor(String name) {
+		// local session is always responder
+		return Optional.ofNullable(publisherContentCreators.get(name)).orElse(Content.Creator.responder);
+	}
+
+	protected void updatePublisherContentCreators(SDP sdp) {
+		for (Content content : sdp.getContents()) {
+			publisherContentCreators.put(content.getName(), content.getCreator());
+		}
+	}
+
+	protected Content.Creator getSubscriberContentCreatorFor(String name) {
+		// local session is always initiator
+		return Optional.ofNullable(subscriberContentCreators.get(name)).orElse(Content.Creator.initiator);
+	}
+
+	protected void updateSubscriberContentCreators(SDP sdp) {
+		for (Content content : sdp.getContents()) {
+			subscriberContentCreators.put(content.getName(), content.getCreator());
+		}
+	}
+	
 	@Override
 	protected void registerBeans(Kernel kernel) {
 		super.registerBeans(kernel);
@@ -123,7 +145,7 @@ public class MeetTest extends AbstractKernelTestCase {
 			public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
 				publisherIceCandidateQueue.offer(() -> {
 					Candidate candidate = Candidate.from(rtcIceCandidate.sdp);
-					Transport transport = SDP.from(publisherConnection.getLocalDescription().sdp, Content.Creator.initiator)
+					Transport transport = SDP.from(publisherConnection.getLocalDescription().sdp, name -> getPublisherContentCreatorFor(name), Content.Creator.initiator)
 							.getContents()
 							.stream()
 							.filter(it -> rtcIceCandidate.sdpMid.equals(it.getName()))
@@ -161,7 +183,7 @@ public class MeetTest extends AbstractKernelTestCase {
 			public void onIceCandidate(RTCIceCandidate rtcIceCandidate) {
 				executor.execute(() -> {
 					Candidate candidate = Candidate.from(rtcIceCandidate.sdp);
-					Transport transport = SDP.from(subscriberConnection.getLocalDescription().sdp, Content.Creator.responder)
+					Transport transport = SDP.from(subscriberConnection.getLocalDescription().sdp, name -> getSubscriberContentCreatorFor(name), Content.Creator.responder)
 							.getContents()
 							.stream()
 							.filter(it -> rtcIceCandidate.sdpMid.equals(it.getName()))
@@ -212,7 +234,7 @@ public class MeetTest extends AbstractKernelTestCase {
 																			  RTCSessionDescription(RTCSdpType.OFFER,
 																									SDP.from(jingleEl).
 
-																											toString("0")),
+																											toString("0", Content.Creator.responder, SDP.Direction.incoming)),
 																	  new
 
 																			  SetSessionDescriptionObserver() {
@@ -250,6 +272,7 @@ public class MeetTest extends AbstractKernelTestCase {
 																															  iqEl.addChild(
 																																	  SDP.from(
 																																			  rtcSessionDescription.sdp,
+																																			  name -> getSubscriberContentCreatorFor(name),
 																																			  Content.Creator.responder)
 																																			  .toElement(
 																																					  Action.sessionAccept,
@@ -290,12 +313,12 @@ public class MeetTest extends AbstractKernelTestCase {
 																					  System.out.println(
 																							  "remote description failed: " +
 																									  s);
-																					  System.out.println("yy: " + SDP.from(jingleEl).toString("0"));
+																					  System.out.println("yy: " + SDP.from(jingleEl).toString("0", Content.Creator.responder, SDP.Direction.incoming));
 																				  }
 																			  });
 						} catch (Throwable ex) {
 							ex.printStackTrace();
-							System.out.println("xx: " + SDP.from(jingleEl).toString("0"));
+							System.out.println("xx: " + SDP.from(jingleEl).toString("0", Content.Creator.responder, SDP.Direction.incoming));
 						}
 					});
 					process(packet.okResult((String) null, 0));
@@ -303,7 +326,7 @@ public class MeetTest extends AbstractKernelTestCase {
 				case sessionAccept:
 					assertEquals(publisherSession.get(), sessionId);
 					//new Thread(() -> {
-						publisherConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.ANSWER, SDP.from(jingleEl).toString("0")),
+						publisherConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.ANSWER, SDP.from(jingleEl).toString("0", Content.Creator.responder, SDP.Direction.incoming)),
 																 new SetSessionDescriptionObserver() {
 																	 @Override
 																	 public void onSuccess() {
@@ -365,9 +388,9 @@ public class MeetTest extends AbstractKernelTestCase {
 				case contentRemove: {
 					SDP sdp = SDP.from(jingleEl);
 					if (sessionId.equals(publisherSession.get())) {
-						SDP oldSdp = SDP.from(publisherConnection.getRemoteDescription().sdp, Content.Creator.responder);
+						SDP oldSdp = SDP.from(publisherConnection.getRemoteDescription().sdp, this::getPublisherContentCreatorFor, Content.Creator.responder);
 						SDP newSdp = oldSdp.applyDiff(ContentAction.fromJingleAction(action), sdp);
-						publisherConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, newSdp.toString("0")),
+						publisherConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, newSdp.toString("0", Content.Creator.responder, SDP.Direction.incoming)),
 																 new SetSessionDescriptionObserver() {
 																	 @Override
 																	 public void onSuccess() {
@@ -381,9 +404,9 @@ public class MeetTest extends AbstractKernelTestCase {
 																 });
 					} else if (sessionId.equals(subscriberSession.get())) {
 						executor.execute(() -> {
-							SDP oldSdp = SDP.from(subscriberConnection.getRemoteDescription().sdp, Content.Creator.initiator);
+							SDP oldSdp = SDP.from(subscriberConnection.getRemoteDescription().sdp, this::getSubscriberContentCreatorFor, Content.Creator.initiator);
 							SDP newSdp = oldSdp.applyDiff(ContentAction.fromJingleAction(action), sdp);
-							subscriberConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, newSdp.toString("0")),
+							subscriberConnection.setRemoteDescription(new RTCSessionDescription(RTCSdpType.OFFER, newSdp.toString("0", Content.Creator.initiator, SDP.Direction.incoming)),
 																	  new SetSessionDescriptionObserver() {
 																		  @Override
 																		  public void onSuccess() {
@@ -397,9 +420,11 @@ public class MeetTest extends AbstractKernelTestCase {
 																															SDP oldSdp = SDP.from(
 																																	subscriberConnection
 																																			.getCurrentLocalDescription().sdp,
+																																	name -> getSubscriberContentCreatorFor(name),
 																																	Content.Creator.responder);
 																															Map<ContentAction, SDP> changes = SDP
 																																	.from(rtcSessionDescription.sdp,
+																																		  name -> getSubscriberContentCreatorFor(name),
 																																		  Content.Creator.responder)
 																																	.diffFrom(
 																																			oldSdp);
@@ -488,7 +513,7 @@ public class MeetTest extends AbstractKernelTestCase {
 					@Override
 					public void onSuccess() {
 						System.out.println("local description set!");
-						SDP sdp = SDP.from(rtcSessionDescription.sdp, Content.Creator.initiator);
+						SDP sdp = SDP.from(rtcSessionDescription.sdp, name -> getPublisherContentCreatorFor(name), Content.Creator.initiator);
 						Element iqEl = new Element("iq");
 						iqEl.setAttribute("id", UUID.randomUUID().toString());
 						iqEl.setAttribute("type", StanzaType.set.name());

@@ -34,7 +34,7 @@ public class Content {
 		return null;
 	}
 
-	public static Content from(String sdp, String[] sessionLines, Content.Creator creator) {
+	public static Content from(String sdp, String[] sessionLines, Function<String,Content.Creator> creatorProvider, Content.Creator localRole) {
 		String[] lines = sdp.split("\r\n");
 		String[] line = lines[0].split(" ");
 		String mediaName = line[0].substring(2);
@@ -53,7 +53,9 @@ public class Content {
 				.findFirst()
 				.map(it -> it.substring("a=ice-ufrag:".length()));
 
-		Optional<Senders> senders = StreamType.fromLines(lines).map(it -> it.toSenders(creator));
+		Content.Creator creator = creatorProvider.apply(name);
+
+		Optional<Senders> senders = StreamType.fromLines(lines).map(it -> it.toSenders(localRole));
 
 		List<String> payloadIds = Arrays.stream(line).limit(lines.length-1).skip(3).collect(Collectors.toList());
 		List<Payload> payloads = payloadIds.stream().map(id -> {
@@ -129,18 +131,28 @@ public class Content {
 		responder,
 		both;
 
-		public StreamType toStreamType(Creator creator) {
+		public StreamType toStreamType(Creator localRole, SDP.Direction direction) {
 			switch (this) {
 				case none:
 					return StreamType.inactive;
 				case both:
 					return StreamType.sendrecv;
 				case initiator:
-					return creator == Creator.initiator ? StreamType.sendonly : StreamType.recvonly;
+					switch (direction) {
+						case outgoing:
+							return localRole == Creator.initiator ? StreamType.sendonly : StreamType.recvonly;
+						case incoming:
+							return localRole == Creator.responder ? StreamType.sendonly : StreamType.recvonly;
+					}
 				case responder:
-					return creator == Creator.responder ? StreamType.sendonly : StreamType.recvonly;
+					switch (direction) {
+						case outgoing:
+							return localRole == Creator.responder ? StreamType.sendonly : StreamType.recvonly;
+						case incoming:
+							return localRole == Creator.initiator ? StreamType.sendonly : StreamType.recvonly;
+					}
 			}
-			throw new IllegalStateException("Unsupported state: " + this.name() + " - " + creator.name());
+			throw new IllegalStateException("Unsupported state: " + this.name() + " - " + localRole.name() + " - " + direction);
 		}
 	}
 
@@ -232,7 +244,7 @@ public class Content {
 		}
 	}
 
-	public String toSDP() {
+	public String toSDP(Content.Creator localRole, SDP.Direction direction) {
 		List<String> lines = new ArrayList<>();
 
 		description.ifPresent(description -> {
@@ -262,7 +274,7 @@ public class Content {
 			});
 		});
 
-		lines.add("a=" + getSenders().toStreamType(creator).name());
+		lines.add("a=" + getSenders().toStreamType(localRole, direction).name());
 //		lines.add("a=sendrecv");
 		lines.add("a=mid:" + name);
 		lines.add("a=ice-options:trickle");
