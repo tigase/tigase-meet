@@ -95,6 +95,11 @@ public class JanusConnection implements WebSocket.Listener {
 			generator.writeNumberField("session_id", session.getSessionId());
 		}).whenComplete((x, ex) -> {
 			if (ex != null) {
+				// do not log JANUS_ERROR_SESSION_NOT_FOUND - it means that session was already destroyed..
+				String msg = ex.getMessage();
+				if (msg != null && msg.startsWith("458 - ")) {
+					return;
+				}
 				log.log(Level.WARNING, ex,
 						() -> session.logPrefix(transaction) +
 								" destruction failed!");
