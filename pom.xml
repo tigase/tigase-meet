@@ -9,7 +9,7 @@
     </parent>
 
     <properties>
-        <license.inlineHeader>${inlineHeader_proprietary}</license.inlineHeader>
+        <license.inlineHeader>${inlineHeader_agpl3}</license.inlineHeader>
 
         <guide_name>Tigase_Meet</guide_name>
         <documentation_phases.all_converters>generate-resources</documentation_phases.all_converters>
@@ -25,6 +25,13 @@
     
     <inceptionYear>2021</inceptionYear>
 
+    <licenses>
+        <license>
+            <name>GNU Affero General Public License GPLv3</name>
+            <url>http://www.gnu.org/licenses/agpl.txt</url>
+        </license>
+    </licenses>
+    
     <scm>
         <connection>scm:git:${scm_repo_base}/tigase-meet.git</connection>
         <developerConnection>scm:git:${scm_repo_base}/tigase-meet.git</developerConnection>
@@ -42,16 +49,6 @@
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
-            </plugin>
-            <plugin>
-                <groupId>com.github.wvengen</groupId>
-                <artifactId>proguard-maven-plugin</artifactId>
-                <executions>
-                    <execution>
-                        <id>Proguard</id>
-                        <phase>package</phase>
-                    </execution>
-                </executions>
             </plugin>
 
             <plugin>
