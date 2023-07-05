@@ -65,90 +65,10 @@ public class JanusService implements Initializable, UnregisterAware {
 
 	@Override
 	public void initialize() {
-		licenceChecker = LicenceChecker.getLicenceChecker("acs", new LicenceCheckerUpdateCallbackImpl("acs") {
-
-			@Override
-			public String getID() {
-				return "meet";
-			}
-
-			@Override
-			public Element getComponentAdditionalData() {
-				Element element = super.getComponentAdditionalData();
-				element.addChild(new Element("meets-count", String.valueOf(meetRepository.size())));
-				element.addChild(new Element("meets-participants-max", String.valueOf(meetRepository.getMaxParticipantsInMeeting())));
-				return element;
-			}
-
-			@Override
-			public String getMissingLicenseWarning() {
-				// FIXME: need a proper warning!!
-				return "\nThis installation contains Tigase Meet package, not an open source software.\nThe Tigase Meet is only available under a commercial license.\nThe full text of the commercial license agreement is available upon request.\n\nMore information about Meet component and licensing can be found here:\nhttp://www.tigase.com/\nThe Tigase Meet component is provided free of charge for testing and\ndevelopment purposes only. Any use of the component on production systems,\neither commercial or not-for-profit, requires the purchase of a license.\n\nIf the Tigase Meet component is activated without a valid license, it will\ncontinue to work, including its full set of features, but it will send\ncertain statistical information to Tigase's servers on a regular basis.\nIf the Tigase Meet component cannot access our servers to send information,\nit will stop working. Once a valid license is installed, the Tigase Meet\ncomponent will stop sending statistical information to Tigase's servers.\n\nBy activating the Tigase Meet component without a valid license you agree\nand accept that the component will send certain statistical information\n(such as DNS domain names, vhost names, number of online users, number of\ncluster nodes, etc.) which may be considered confidential and proprietary\nby the user. You accept and confirm that such information, which may be\nconsidered confidential or proprietary, will be transferred to Tigase's\nservers and that you will not pursue any remedy at law as a result of the\ninformation transfer.\nIf the Tigase Meet component is installed but not activated, no statistical\ninformation will be sent to Tigase's servers.";
-			}
-
-			@Override
-			public boolean additionalValidation(Licence lic) {
-				if (!super.additionalValidation(lic)) {
-					return false;
-				}
-
-				// FIXME: we need to retrieve "limits" from license and check them
-				if (meetRepository.size() > lic.getPropertyAsInteger("meets-limit")) {
-					return false;
-				}
-
-				if (meetRepository.getMaxParticipantsInMeeting() > lic.getPropertyAsInteger("meets-participants-max")) {
-					return false;
-				}
-				return true;
-			}
-		});
+		licenceChecker = LicenceChecker.getLicenceChecker("acs", new MeetLicenceCheckerUpdateCallback("acs"));
 		try {
 			SSLContext sslContext = SSLContext.getInstance("TLS");
-			sslContext.init(null, new TrustManager[] {
-					new X509ExtendedTrustManager() {
-						@Override
-						public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket)
-								throws CertificateException {
-							
-						}
-
-						@Override
-						public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket)
-								throws CertificateException {
-
-						}
-
-						@Override
-						public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
-								throws CertificateException {
-
-						}
-
-						@Override
-						public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
-								throws CertificateException {
-
-						}
-
-						@Override
-						public void checkClientTrusted(X509Certificate[] chain, String authType)
-								throws CertificateException {
-							
-						}
-
-						@Override
-						public void checkServerTrusted(X509Certificate[] chain, String authType)
-								throws CertificateException {
-
-						}
-
-						@Override
-						public X509Certificate[] getAcceptedIssuers() {
-							return new X509Certificate[0];
-						}
-					}
-			}, null);
+			sslContext.init(null, new TrustManager[] {new DummyTrustManager()}, null);
 			client = HttpClient.newBuilder().sslContext(sslContext).build();
 			executorService = Executors.newScheduledThreadPool(4);
 		} catch (Exception e) {
@@ -160,6 +80,125 @@ public class JanusService implements Initializable, UnregisterAware {
 	public void beforeUnregister() {
 		if (executorService != null) {
 			executorService.shutdown();
+		}
+	}
+
+	class MeetLicenceCheckerUpdateCallback
+			extends LicenceCheckerUpdateCallbackImpl {
+		private static final String MEET_PARTICIPANTS_MAX_KEY = "meets-participants-max";
+		private static final String MEET_LIMIT_KEY = "meets-limit";
+
+		public MeetLicenceCheckerUpdateCallback(String cmpName) {
+			super(cmpName);
+		}
+
+		@Override
+		public String getID() {
+			return "meet";
+		}
+
+		@Override
+		public Element getComponentAdditionalData() {
+			Element element = super.getComponentAdditionalData();
+			element.addChild(new Element("meets-count", String.valueOf(meetRepository.size())));
+			element.addChild(new Element(MEET_PARTICIPANTS_MAX_KEY, String.valueOf(meetRepository.getMaxParticipantsInMeeting())));
+			return element;
+		}
+
+		@Override
+		public String getMissingLicenseWarning() {
+			// FIXME: need a proper warning!!
+			// @formatter:off
+			return "\n" +
+					"This installation contains Tigase Meet package, not an open source software.\n" +
+					"The Tigase Meet is only available under a commercial license.\n" +
+					"The full text of the commercial license agreement is available upon request.\n" +
+					"\n" +
+					"More information about Meet component and licensing can be found here:\n" +
+					"http://www.tigase.com/\n" +
+					"The Tigase Meet component is provided free of charge for testing and\n" +
+					"development purposes only. Any use of the component on production systems,\n" +
+					"either commercial or not-for-profit, requires the purchase of a license.\n" +
+					"\n" +
+					"If the Tigase Meet component is activated without a valid license, it will\n" +
+					"continue to work, including its full set of features, but it will send\n" +
+					"certain statistical information to Tigase's servers on a regular basis.\n" +
+					"If the Tigase Meet component cannot access our servers to send information,\n" +
+					"it will stop working. Once a valid license is installed, the Tigase Meet\n" +
+					"component will stop sending statistical information to Tigase's servers.\n" +
+					"\n" +
+					"By activating the Tigase Meet component without a valid license you agree\n" +
+					"and accept that the component will send certain statistical information\n" +
+					"(such as DNS domain names, vhost names, number of online users, number of\n" +
+					"cluster nodes, etc.) which may be considered confidential and proprietary\n" +
+					"by the user. You accept and confirm that such information, which may be\n" +
+					"considered confidential or proprietary, will be transferred to Tigase's\n" +
+					"servers and that you will not pursue any remedy at law as a result of the\n" +
+					"information transfer.\n" +
+					"If the Tigase Meet component is installed but not activated, no statistical\n" +
+					"information will be sent to Tigase's servers.";
+			// @formatter:on
+		}
+
+		@Override
+		public boolean additionalValidation(Licence lic) {
+			if (!super.additionalValidation(lic)) {
+				return false;
+			}
+
+			final Integer meetLimit = lic.getPropertyAsInteger(MEET_LIMIT_KEY);
+			if (meetLimit != null && meetRepository.size() > meetLimit) {
+				return false;
+			}
+
+			final Integer meetParticipantsMax = lic.getPropertyAsInteger(MEET_PARTICIPANTS_MAX_KEY);
+			if (meetParticipantsMax != null && meetRepository.getMaxParticipantsInMeeting() > meetParticipantsMax) {
+				return false;
+			}
+			return true;
+		}
+	}
+
+	static class DummyTrustManager extends X509ExtendedTrustManager {
+		@Override
+		public void checkClientTrusted(X509Certificate[] chain, String authType, Socket socket)
+				throws CertificateException {
+
+		}
+
+		@Override
+		public void checkServerTrusted(X509Certificate[] chain, String authType, Socket socket)
+				throws CertificateException {
+
+		}
+
+		@Override
+		public void checkClientTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
+				throws CertificateException {
+
+		}
+
+		@Override
+		public void checkServerTrusted(X509Certificate[] chain, String authType, SSLEngine engine)
+				throws CertificateException {
+
+		}
+
+		@Override
+		public void checkClientTrusted(X509Certificate[] chain, String authType)
+				throws CertificateException {
+
+		}
+
+		@Override
+		public void checkServerTrusted(X509Certificate[] chain, String authType)
+				throws CertificateException {
+
+		}
+
+		@Override
+		public X509Certificate[] getAcceptedIssuers() {
+			return new X509Certificate[0];
 		}
 	}
 
