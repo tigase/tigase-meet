@@ -17,7 +17,7 @@
     </properties>
 
     <artifactId>tigase-meet</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>Tigase Meet</name>
@@ -29,7 +29,7 @@
         <connection>scm:git:${scm_repo_base}/tigase-meet.git</connection>
         <developerConnection>scm:git:${scm_repo_base}/tigase-meet.git</developerConnection>
         <url>https://projects.tigase.org/projects/tigase-meet/repository</url>
-        <tag>tigase-meet-1.0.1</tag>
+        <tag>tigase-meet-1.0.0</tag>
     </scm>
 
     <organization>
