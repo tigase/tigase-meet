@@ -18,6 +18,7 @@
 package tigase.meet.janus.videoroom;
 
 import tigase.meet.janus.JSEP;
+import tigase.meet.janus.JanusException;
 import tigase.meet.janus.JanusPlugin;
 import tigase.meet.janus.JanusSession;
 
@@ -101,6 +102,12 @@ public class LocalPublisher {
 			}
 		}).whenComplete((x, ex) -> {
 			if (ex != null) {
+				if (ex instanceof JanusException) {
+					// room which we try to leave was already removed
+					if (((JanusException) ex).getCode() == 426) {
+						return;
+					}
+				}
 				log.log(Level.WARNING, ex, () -> toString() + ", transaction " + transaction + ", publisher " + id +
 						" failed to leave room!");
 			} else {

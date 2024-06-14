@@ -37,4 +37,8 @@ public class JanusException extends RuntimeException {
 	public JanusException(Map<String, Object> error) {
 		this((Integer) error.get("code"), (String) error.get("reason"));
 	}
+
+	public int getCode() {
+		return code;
+	}
 }
