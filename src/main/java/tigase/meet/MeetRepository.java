@@ -45,6 +45,8 @@ public class MeetRepository implements IMeetRepository {
 			desc = "Bean name"
 	)
 	private String name;
+	@ConfigField(desc = "Video codec", alias = "video-codec")
+	private String videoCodec;
 
 	@Inject(bean = "service")
 	private AbstractMessageReceiver component;
@@ -154,7 +156,7 @@ public class MeetRepository implements IMeetRepository {
 		return janusService.newConnection()
 				.thenCompose(connection -> connection.createSession()
 						.thenCompose(session -> session.attachPlugin(JanusVideoRoomPlugin.class)
-								.thenCompose(videoRoomPlugin -> videoRoomPlugin.createRoom(null, maxNoOfPublishers))
+								.thenCompose(videoRoomPlugin -> videoRoomPlugin.createRoom(null, maxNoOfPublishers, videoCodec))
 								.exceptionallyCompose(
 										ex -> session.destroy().handle((x, ex1) -> CompletableFuture.failedFuture(ex))))
 						// we should close this session even it is not connected? or maybe we should store it?

@@ -52,6 +52,7 @@ public class LocalSubscriber {
 				", joining room as subscriber..");
 		return videoRoomPlugin.execute("join", transaction, roomId, generator -> {
 			generator.writeStringField("ptype", "subscriber");
+			generator.writeBooleanField("autoupdate", true);
 			if (privateId != null) {
 				generator.writeNumberField("private_id", privateId);
 			}
@@ -172,7 +173,7 @@ public class LocalSubscriber {
 
 	public void handleEvent(JanusVideoRoomPlugin.Content content) {
 		if ("updated".equals(content.getVideoRoom()) && content.data.containsKey("streams")) {
-			log.log(Level.FINER, () -> toString() + " updated subscribed streams: " + content.data.get("streams"));
+			log.log(Level.FINEST, () -> toString() + " updated subscribed streams: " + content.data.get("streams") + ", jsep: " + content.jsep);
 			if (content.jsep != null) {
 				listener.receivedSubscriberSDP(content.jsep);
 			}

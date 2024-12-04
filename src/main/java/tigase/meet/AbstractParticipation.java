@@ -26,6 +26,7 @@ import tigase.meet.janus.videoroom.Publisher;
 
 import java.util.Collection;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -103,8 +104,14 @@ public abstract class AbstractParticipation<P extends AbstractParticipation<P,M>
 		if (ex != null) {
 			log.log(Level.WARNING, ex, () -> "participation " + toString() + " leaving due to error");
 		}
-		meet.left((P) this);
-		return CompletableFuture.allOf(publisher.leave()).thenCompose(x -> publisher.getSession().destroy());
+		if (meet.left((P) this)) {
+			return publisher.unpublish()
+					.thenCompose(x -> new CompletableFuture<>().completeOnTimeout(x, 1, TimeUnit.SECONDS))
+					.thenCompose(x -> publisher.leave())
+					.thenCompose(x -> publisher.getSession().destroy());
+		} else {
+			return CompletableFuture.completedFuture(null);
+		}
 	}
 
 	@Override

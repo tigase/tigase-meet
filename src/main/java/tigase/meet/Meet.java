@@ -98,11 +98,14 @@ public class Meet extends AbstractMeet<Participation> {
 		return participationByJid.get(jid);
 	}
 
-	public void left(Participation participation) {
+	@Override
+	public boolean left(Participation participation) {
 		this.participationByJid.remove(participation.getJid());
 		if (this.participationByJid.isEmpty()) {
 			destroy();
+			return false;
 		}
+		return true;
 	}
 
 	public boolean hasParticipants() {

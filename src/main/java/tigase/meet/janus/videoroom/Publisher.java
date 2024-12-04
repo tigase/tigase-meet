@@ -104,6 +104,12 @@ public class Publisher {
 		public int getMindex() {
 			return mindex;
 		}
+
+		@Override
+		public String toString() {
+			return "Stream{" + "type=" + type + ", mid='" + mid + '\'' + ", description='" + description + '\'' +
+					", mindex=" + mindex + '}';
+		}
 	}
 
 	@Override

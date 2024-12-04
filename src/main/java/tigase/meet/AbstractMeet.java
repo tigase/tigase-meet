@@ -75,7 +75,7 @@ public abstract class AbstractMeet<T extends AbstractParticipation> {
 				.thenAccept(x -> janusConnection.close());
 	}
 
-	public abstract void left(T participation);
+	public abstract boolean left(T participation);
 
 	@Override
 	public String toString() {

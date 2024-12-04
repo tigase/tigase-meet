@@ -17,6 +17,7 @@
  */
 package tigase.meet;
 
+import tigase.eventbus.EventBusEvent;
 import tigase.xmpp.jid.BareJID;
 import tigase.xmpp.jid.JID;
 
@@ -24,7 +25,7 @@ public interface IPresenceRepository {
 
 	boolean isAvailable(BareJID meetJid, JID jid);
 
-	class UserDisappearedEvent {
+	static class UserDisappearedEvent implements EventBusEvent {
 
 		private final BareJID meetJid;
 		private final JID jid;

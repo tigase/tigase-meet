@@ -69,11 +69,14 @@ public class JanusVideoRoomPlugin extends JanusPlugin<JanusVideoRoomPlugin.Conte
 		}
 	}
 
-	public CompletableFuture<Object> createRoom(Object roomId, int maxNoOfPublishers) {
+	public CompletableFuture<Object> createRoom(Object roomId, int maxNoOfPublishers, String videoCodec) {
 		String transaction = getSession().nextTransactionId();
 		log.log(Level.FINER, () -> toString() + ", transaction " + transaction + " creating room " + roomId + "...");
 		return execute("create", transaction, roomId, generator -> {
 			generator.writeNumberField("publishers", maxNoOfPublishers);
+			if (videoCodec != null && !videoCodec.isEmpty()) {
+				generator.writeStringField("videocodec", videoCodec);
+			}
 			generator.writeBooleanField("notify_joining", true);
 		}, null).thenApply(content -> {
 			String videoroom = content.getVideoRoom();

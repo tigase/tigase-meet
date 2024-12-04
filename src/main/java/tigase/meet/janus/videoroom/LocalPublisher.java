@@ -165,6 +165,7 @@ public class LocalPublisher {
 	}
 
 	public void handleEvent(JanusVideoRoomPlugin.Content content) {
+		log.finest(() -> "received event for room " + content.getRoom() + ", with data: " + content.data);
 		if ("event".equals(content.getVideoRoom()) && roomId.equals(content.getRoom())) {
 			List<Publisher> publishers = Publisher.fromEvent(
 					(List<Map<String, Object>>) content.data.get("publishers"));
@@ -174,8 +175,9 @@ public class LocalPublisher {
 				if (listener != null) {
 					listener.addedPublishers(publishers);
 				}
-			} else if (content.data.containsKey("unpublished")) {
+			} else if (content.data.containsKey("unpublished") || content.data.containsKey("leaving")) {
 				Optional.ofNullable(content.data.get("unpublished"))
+						.or(() -> Optional.ofNullable(content.data.get("leaving")))
 						.filter(Number.class::isInstance)
 						.map(Number.class::cast)
 						.ifPresent(id -> {

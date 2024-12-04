@@ -102,6 +102,9 @@ public class JanusConnection implements WebSocket.Listener {
 	public CompletableFuture<Void> destroySession(JanusSession session) {
 		String transaction = nextTransactionId();
 		log.log(Level.FINER, () -> session.logPrefix(transaction) + " destroying ..");
+		if (activeSessions.remove(session.getSessionId()) == null) {
+			return CompletableFuture.completedFuture(null);
+		}
 		return execute("destroy", transaction, generator -> {
 			generator.writeNumberField("session_id", session.getSessionId());
 		}).whenComplete((x, ex) -> {

@@ -131,6 +131,7 @@ public class JanusSession {
 	public CompletableFuture<Void> detachPlugin(JanusPlugin plugin) {
 		String transaction = nextTransactionId();
 		log.log(Level.FINER, () -> this.logPrefix(transaction) + ", detaching plugin " + plugin + "...");
+		this.attachedPlugins.remove(plugin.getHandleId());
 		return execute("detach", transaction, generator -> {
 			generator.writeNumberField("handle_id", plugin.getHandleId());
 		}).whenComplete((x, ex) -> {
@@ -142,7 +143,6 @@ public class JanusSession {
 				if (keepAliveFuture != null) {
 					keepAliveFuture.cancel(false);
 				}
-				this.attachedPlugins.remove(plugin.getHandleId());
 			}
 		}).thenApply(x -> null);
 	}
@@ -162,7 +162,7 @@ public class JanusSession {
 	public CompletableFuture<Void> destroy() {
 		CompletableFuture<Void> future = new CompletableFuture<>();
 		CompletableFuture.allOf(
-				attachedPlugins.values().stream().map(plugin -> detachPlugin(plugin)).toArray(CompletableFuture[]::new))
+				attachedPlugins.values().stream().map(this::detachPlugin).toArray(CompletableFuture[]::new))
 				.whenComplete((x, ex) -> {
 					if (ex != null) {
 						future.completeExceptionally(ex);
