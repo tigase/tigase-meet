@@ -1,4 +1,4 @@
-version: 29
+version: 39
 imports:
 - projectPath: Templates
   revision: main
@@ -8,6 +8,11 @@ jobs:
   - !UseTemplateStep
     name: maven build & deploy
     templateName: Tigase Server - Maven build & deploy
+    paramMatrix:
+    - name: timestamp-to-make-distinct
+      valuesProvider: !ScriptingValues
+        scriptName: get-timestamp
+      secret: false
     condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
   triggers:
   - !BranchUpdateTrigger {}
