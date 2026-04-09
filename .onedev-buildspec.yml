@@ -1,9 +1,10 @@
-version: 39
+version: 40
 imports:
 - projectPath: Templates
-  revision: main
+  revision: 0.0.8
 jobs:
 - name: Maven CI
+  jobExecutor: linux
   steps:
   - !UseTemplateStep
     name: maven build & deploy
@@ -13,10 +14,15 @@ jobs:
       valuesProvider: !ScriptingValues
         scriptName: get-timestamp
       secret: false
-    condition: ALL_PREVIOUS_STEPS_WERE_SUCCESSFUL
+    condition: SUCCESSFUL
+    optional: false
   triggers:
   - !BranchUpdateTrigger {}
   retryCondition: never
   maxRetries: 3
   retryDelay: 30
   timeout: 3600
+  postBuildActions:
+  - !SendNotificationAction
+    condition: failed
+    receivers: group(TigaseCoreTeam)
